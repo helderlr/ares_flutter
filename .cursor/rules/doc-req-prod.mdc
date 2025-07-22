@@ -1,0 +1,115 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Crie um aplicativo mobile completo em Flutter com as seguintes especificações:
+
+Interface moderna e responsiva, seguindo o padrão de design do menu lateral (Drawer) semelhante ao do aplicativo Gmail.
+
+Funcionalidades principais:
+
+Menu com as seguintes opcoes:
+Cadastros
+  Paciente
+  Medico
+  Tipo Cirurgia
+  Hospital
+  Convenio
+Movimento
+  Agendamento
+  Remarcar
+  Cancelar
+Configuracao
+Termos e Condicoes
+Política de Privacidade
+Sair
+
+Autenticação com JWT:
+
+Tela de login e cadastro
+-  usando a api url http://45.162.242.43:3051
+-  usar logo (pegar da classe empresa da api da url http://45.162.242.43:3051)
+- o login sera o campo login da classe usuario da api
+- a senha sera o campo 
+- pegar o campo codven da classe usuario para ser usado para gravar na agenda cirurgia o vendedor da agenda
+
+Proteção de rotas e sessão com tokens JWT
+
+Cadastros básicos com CRUD
+
+Paciente (codigo,nome, idade, carteira)
+
+Médico (codigo,nome, CRM, alcunha,especialidade)
+
+Tipo de cirurgia (codigo,nome)
+
+Hospital (codigo,fantasia, razao social, telefone)
+
+Convênio (codigo,fantasia,razao social)
+
+Agendamento de cirurgias:
+
+Tela para selecionar paciente, médico, tipo de cirurgia, hospital , convênio,vendedor,lado cirurgia (esquerdo,direito,nulo),tipo (primaria,revisao),material cirurgia (descrever campo texto)
+
+Data/hora da cirurgia com validação de conflitos
+
+tela Listagem com filtros por periodo,medico,tipo cirurgia,hospital,convenio, 
+
+tela grafico agendas periodo e filtro medico,tipo cirurgia,hospital,
+
+tela gerenciamento de agendamentos futuros e passados
+
+Remarcar Cirurgia
+
+Cancelar Cirurgia
+
+registrar horario cirurgia (informar numero agenda,hora inicial,hora final)
+
+Parâmetros de configuração:
+
+configurar a url da api a ser usada
+
+Avaliação do aplicativo:
+
+Tela onde o usuário pode dar nota (1–5 estrelas) e deixar comentários,
+
+Termos e Condições
+
+Política de Privacidade:
+
+Páginas acessíveis via menu lateral
+
+Texto carregado dinamicamente ou incluído no app
+
+Estrutura técnica:
+Flutter com State Management (Provider ou Riverpod)
+
+API remota REST (ex: backend em .net core)
+
+Endpoints protegidos com JWT
+
+Todas as entidades devem ter CRUD completo
+
+Armazenamento local mínimo (ex: SharedPreferences para token JWT)
+
+Código organizado por módulos/features
+
+Separar responsabilidades: serviços, modelos, telas, widgets
+
+Extra:
+Fornecer um README com instruções para configurar e executar o app
+
+compartilhar agenda com whatsapp
+
+use icones de acordo com a opcao
+
+use cores azul claro e branco nas telas
+
+controle de Claro e escuro (tema)
+
+Comentários no código explicando partes críticas
+
+Sugestão de deploy no google play e apple store
+
+controle de versao no github

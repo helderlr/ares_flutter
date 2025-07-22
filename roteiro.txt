@@ -1,0 +1,29 @@
+https://crop-circle.imageonline.co/
+//tirar imagem circular logo 
+//adicionar imagem circular e opcao gravar config
+Ares flutter
+//criar tela login e chamar menu
+definir logo ideal
+//Nome usuario-pegar tela login
+definir funcao base64 pra criptografia 
+usar jwt api pra autenticar
+criar tela splash usando logo shared preference
+//ok logo circular
+//alterar logo e salvar shared preference
+Criar termos uso
+//Config IP remoto com formatação e validação
+//Logo gravar shared preference
+//Menu colocar logo
+Tela fundo chamar alguma opcao
+Política privacidade
+Avaliar aplicativo
+Central permissoes
+Notificacao tela principal
+Usar função base64 pro flutter e delphi
+Versão e logo ares
+Mudar usuario
+Ajuda -termo uso e política privacidade e ajuda por topico
+Enviar gasto sala,guia autorizacao
+Conferência material leitor
+
+criar rules senior .net core ,entity,ver as tecnologias que usei,ler projeto dt_ares_api
