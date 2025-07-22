@@ -21,12 +21,13 @@ Aplicativo Flutter para gerenciamento de agendamentos de cirurgias.
 - Organização por módulos/features seguindo arquitetura limpa
 - Gerenciamento de estado com Riverpod
 - Navegação com AutoRoute
+- Paginação híbrida com ordenação alfabética
 
 ## 🚀 Como rodar o projeto
 
 1. **Clone o repositório:**
    ```sh
-   git clone https://github.com/seu-usuario/ares_flutter.git
+   git clone https://github.com/helderlr/ares_flutter.git
    cd ares_flutter
    ```
 
@@ -196,4 +197,64 @@ O app exibe mensagens detalhadas de erro durante o login:
 1. Verifique se o token está sendo salvo
 2. Confirme formato da resposta da API
 3. Teste logout e login novamente
-4. Limpe dados do app se necessário 
+4. Limpe dados do app se necessário
+
+## 📊 Paginação e Ordenação
+
+### Paginação Híbrida
+- Carregamento inicial de todos os registros
+- Paginação local com 15 registros por página
+- Scroll infinito para carregar mais dados
+- Indicador visual de progresso
+
+### Ordenação
+- Ordenação alfabética por padrão
+- Menu de ordenação com opções:
+  - Por Nome (alfabética)
+  - Por Código (numérica)
+  - Por Data de Nascimento (cronológica)
+- Indicador visual do tipo de ordenação atual
+
+### Pesquisa
+- Pesquisa em tempo real
+- Filtra por nome e número da carteira
+- Mantém ordenação durante a pesquisa
+- Reset automático da paginação
+
+## 🔄 Controle de Versão
+
+### Branches
+- `main`: Branch principal com código estável
+- `develop`: Branch de desenvolvimento
+- `feature/*`: Branches para novas funcionalidades
+
+### Commits
+- Commits semânticos seguindo convenções
+- Mensagens em português
+- Descrições detalhadas das mudanças
+
+## 📱 Deploy
+
+### Google Play Store
+- Build de release otimizado
+- Assinatura com keystore
+- Configuração de permissões
+- Screenshots e descrições
+
+### Apple App Store
+- Build para iOS
+- Certificados de distribuição
+- Configuração de capabilities
+- Review process
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch para sua feature
+3. Commit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
