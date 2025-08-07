@@ -26,7 +26,7 @@ class AuthService {
     final requestBody = {
       'nomusu': nomusu,
       'login': login,
-      'senha': senha,
+      'senhaw': senha, // Mudança: enviar 'senhaw' em vez de 'senha'
     };
 
     print('Body JSON: ${jsonEncode(requestBody)}');

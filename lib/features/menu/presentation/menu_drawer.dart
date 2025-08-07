@@ -42,19 +42,33 @@ class _MenuDrawerState extends State<MenuDrawer> {
     final prefs = await SharedPreferences.getInstance();
     final savedAvatar = prefs.getString('avatar_path');
     final savedUserAvatar = prefs.getString('user_avatar_path');
+
+    // Verificar se os arquivos existem
+    File? avatarFileToSet;
+    String? avatarPathToSet;
+    if (savedAvatar != null && savedAvatar.isNotEmpty) {
+      final file = File(savedAvatar);
+      if (await file.exists()) {
+        avatarPathToSet = savedAvatar;
+        avatarFileToSet = file;
+      }
+    }
+
+    File? userAvatarFileToSet;
+    String? userAvatarPathToSet;
+    if (savedUserAvatar != null && savedUserAvatar.isNotEmpty) {
+      final file = File(savedUserAvatar);
+      if (await file.exists()) {
+        userAvatarPathToSet = savedUserAvatar;
+        userAvatarFileToSet = file;
+      }
+    }
+
     setState(() {
-      if (savedAvatar != null &&
-          savedAvatar.isNotEmpty &&
-          File(savedAvatar).existsSync()) {
-        avatarPath = savedAvatar;
-        avatarFile = File(savedAvatar);
-      }
-      if (savedUserAvatar != null &&
-          savedUserAvatar.isNotEmpty &&
-          File(savedUserAvatar).existsSync()) {
-        userAvatarPath = savedUserAvatar;
-        userAvatarFile = File(savedUserAvatar);
-      }
+      avatarPath = avatarPathToSet;
+      avatarFile = avatarFileToSet;
+      userAvatarPath = userAvatarPathToSet;
+      userAvatarFile = userAvatarFileToSet;
     });
   }
 
@@ -75,10 +89,8 @@ class _MenuDrawerState extends State<MenuDrawer> {
             currentAccountPicture: CircleAvatar(
               backgroundColor: AppColors.white,
               backgroundImage:
-                  (userAvatarFile != null && userAvatarFile!.existsSync())
-                      ? FileImage(userAvatarFile!)
-                      : null,
-              child: (userAvatarFile == null || !(userAvatarFile!.existsSync()))
+                  (userAvatarFile != null) ? FileImage(userAvatarFile!) : null,
+              child: (userAvatarFile == null)
                   ? const Icon(Icons.account_circle,
                       size: 48, color: AppColors.lightBlue)
                   : null,

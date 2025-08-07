@@ -61,7 +61,7 @@ class PaginationInfo {
   factory PaginationInfo.fromJson(Map<String, dynamic> json) {
     return PaginationInfo(
       currentPage: json['currentPage'] ?? 1,
-      pageSize: json['pageSize'] ?? 10,
+      pageSize: json['pageSize'] ?? 50,
       totalRecords: json['totalRecords'] ?? 0,
       totalPages: json['totalPages'] ?? 0,
       hasNextPage: json['hasNextPage'] ?? false,
@@ -80,9 +80,52 @@ class PaginatedResponse {
   });
 
   factory PaginatedResponse.fromJson(Map<String, dynamic> json) {
-    final List<dynamic> data = json['data'] ?? [];
+    // Verifica se é o formato esperado com data e pagination
+    if (json.containsKey('data') && json.containsKey('pagination')) {
+      final List<dynamic> data = json['data'] ?? [];
+      final patients = data.map((item) => Patient.fromJson(item)).toList();
+      final pagination = PaginationInfo.fromJson(json['pagination'] ?? {});
+
+      return PaginatedResponse(
+        patients: patients,
+        pagination: pagination,
+      );
+    }
+
+    // Se não tem data/pagination, assume que é uma lista direta
+    // e cria uma paginação simulada
+    final List<dynamic> data = json is List ? json as List<dynamic> : [];
     final patients = data.map((item) => Patient.fromJson(item)).toList();
-    final pagination = PaginationInfo.fromJson(json['pagination'] ?? {});
+
+    // Cria paginação simulada para compatibilidade
+    final pagination = PaginationInfo(
+      currentPage: 1,
+      pageSize: 50,
+      totalRecords: patients.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    );
+
+    return PaginatedResponse(
+      patients: patients,
+      pagination: pagination,
+    );
+  }
+
+  // Construtor para quando a API retorna uma lista diretamente
+  factory PaginatedResponse.fromList(List<dynamic> data) {
+    final patients = data.map((item) => Patient.fromJson(item)).toList();
+
+    // Cria paginação simulada
+    final pagination = PaginationInfo(
+      currentPage: 1,
+      pageSize: 50,
+      totalRecords: patients.length,
+      totalPages: 1,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    );
 
     return PaginatedResponse(
       patients: patients,
@@ -94,39 +137,55 @@ class PaginatedResponse {
 class PatientServicePaginado {
   static const String baseUrl = 'https://45.162.242.43';
 
-  /// Busca pacientes com paginação real
   Future<PaginatedResponse> fetchPatientsPaginated({
     required int page,
-    required int pageSize,
+    int pageSize = 50,
     String? sortBy,
     String? sortOrder,
     String? searchQuery,
   }) async {
-    // Constrói a URL com parâmetros de paginação
     final queryParams = <String, String>{
-      'page': page.toString(),
-      'pageSize': pageSize.toString(),
+      'PageNumber': page.toString(),
+      'PageSize': pageSize.toString(),
     };
 
     if (sortBy != null) {
-      queryParams['sortBy'] = sortBy;
-    }
-    if (sortOrder != null) {
-      queryParams['sortOrder'] = sortOrder;
+      // Mapeia os campos para os nomes corretos da API
+      String orderByField;
+      switch (sortBy) {
+        case 'name':
+          orderByField = 'nompac';
+          break;
+        case 'id':
+          orderByField = 'codpac';
+          break;
+        case 'birthDate':
+          orderByField = 'datnas';
+          break;
+        default:
+          orderByField = 'nompac';
+      }
+      queryParams['OrderBy'] = '$orderByField ${sortOrder ?? 'asc'}';
+      print('📊 Ordenação configurada: $orderByField ${sortOrder ?? 'asc'}');
     }
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      queryParams['search'] = searchQuery;
+      // Usa o parâmetro correto da API: NOMPAC
+      queryParams['NOMPAC'] = searchQuery;
+      print('🔍 Parâmetro de busca adicionado: NOMPAC=$searchQuery');
+      print('🔍 Query params atualizados: $queryParams');
     }
 
-    final uri = Uri.parse('$baseUrl/api/Paciente/list_paciente')
+    final uri = Uri.parse('$baseUrl/api/Paciente/paginated')
         .replace(queryParameters: queryParams);
     final url = uri.toString();
 
     print('🔍 DEBUG PAGINAÇÃO:');
     print('URL: $url');
     print('Página: $page, Tamanho: $pageSize');
+    print('Ordenação: $sortBy $sortOrder');
+    print('Busca: $searchQuery');
+    print('📋 Parâmetros enviados: $queryParams');
 
-    // Obtém o token JWT
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('jwt_token');
 
@@ -153,12 +212,34 @@ class PatientServicePaginado {
       if (httpResponse.statusCode == 200) {
         final data = json.decode(responseBody);
         print('✅ Dados paginados recebidos');
+        print('Tipo de resposta: ${data.runtimeType}');
 
-        final response = PaginatedResponse.fromJson(data);
+        PaginatedResponse response;
+
+        // Verifica se é uma lista direta ou objeto com data/pagination
+        if (data is List) {
+          print('📋 API retornou lista direta com ${data.length} pacientes');
+          response = PaginatedResponse.fromList(data);
+        } else if (data is Map<String, dynamic>) {
+          print('📋 API retornou objeto com data e pagination');
+          response = PaginatedResponse.fromJson(data);
+        } else {
+          throw Exception(
+              'Formato de resposta inesperado: ${data.runtimeType}');
+        }
+
         print(
             '📊 Página ${response.pagination.currentPage} de ${response.pagination.totalPages}');
         print('📋 ${response.patients.length} pacientes nesta página');
         print('📈 Total de registros: ${response.pagination.totalRecords}');
+        if (searchQuery != null && searchQuery.isNotEmpty) {
+          print(
+              '🔍 Busca por "$searchQuery" retornou ${response.patients.length} resultados');
+          if (response.patients.isNotEmpty) {
+            print(
+                '📝 Primeiros resultados: ${response.patients.take(3).map((p) => p.name).join(', ')}');
+          }
+        }
 
         httpClient.close();
         return response;
@@ -176,9 +257,12 @@ class PatientServicePaginado {
     }
   }
 
-  /// Busca a próxima página
   Future<PaginatedResponse> fetchNextPage(
-      PaginationInfo currentPagination) async {
+    PaginationInfo currentPagination, {
+    String? sortBy,
+    String? sortOrder,
+    String? searchQuery,
+  }) async {
     if (!currentPagination.hasNextPage) {
       throw Exception('Não há mais páginas para carregar');
     }
@@ -186,12 +270,18 @@ class PatientServicePaginado {
     return fetchPatientsPaginated(
       page: currentPagination.currentPage + 1,
       pageSize: currentPagination.pageSize,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+      searchQuery: searchQuery,
     );
   }
 
-  /// Busca a página anterior
   Future<PaginatedResponse> fetchPreviousPage(
-      PaginationInfo currentPagination) async {
+    PaginationInfo currentPagination, {
+    String? sortBy,
+    String? sortOrder,
+    String? searchQuery,
+  }) async {
     if (!currentPagination.hasPreviousPage) {
       throw Exception('Não há página anterior');
     }
@@ -199,14 +289,25 @@ class PatientServicePaginado {
     return fetchPatientsPaginated(
       page: currentPagination.currentPage - 1,
       pageSize: currentPagination.pageSize,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+      searchQuery: searchQuery,
     );
   }
 
-  /// Busca uma página específica
-  Future<PaginatedResponse> fetchPage(int page, {int pageSize = 10}) async {
+  Future<PaginatedResponse> fetchPage(
+    int page, {
+    int pageSize = 50,
+    String? sortBy,
+    String? sortOrder,
+    String? searchQuery,
+  }) async {
     return fetchPatientsPaginated(
       page: page,
       pageSize: pageSize,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+      searchQuery: searchQuery,
     );
   }
 }

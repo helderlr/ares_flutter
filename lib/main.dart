@@ -7,7 +7,7 @@ import 'features/menu/model/menu_option.dart';
 import 'features/paciente/presentation/paciente_page.dart';
 import 'features/configuracao/presentation/configuracao_page.dart';
 import 'features/login/presentation/login_page.dart';
-import 'features/login/services/auth_service.dart';
+import 'features/login/services/auth_service.dart'; // Usar serviço simples
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:convert';

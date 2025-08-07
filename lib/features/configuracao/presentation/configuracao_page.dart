@@ -37,28 +37,39 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
     final savedIp = prefs.getString('remote_ip') ?? '';
     final savedAvatar = prefs.getString('avatar_path');
     final savedUserAvatar = prefs.getString('user_avatar_path');
+
+    // Verificar se o arquivo de avatar existe
+    File? avatarFileToSet;
+    String? avatarPathToSet = savedAvatar;
+    if (savedAvatar != null && savedAvatar.isNotEmpty) {
+      final file = File(savedAvatar);
+      if (await file.exists()) {
+        avatarFileToSet = file;
+      } else {
+        avatarPathToSet = null;
+        await prefs.remove('avatar_path');
+      }
+    }
+
+    // Verificar se o arquivo de user avatar existe
+    File? userAvatarFileToSet;
+    String? userAvatarPathToSet = savedUserAvatar;
+    if (savedUserAvatar != null && savedUserAvatar.isNotEmpty) {
+      final file = File(savedUserAvatar);
+      if (await file.exists()) {
+        userAvatarFileToSet = file;
+      } else {
+        userAvatarPathToSet = null;
+        await prefs.remove('user_avatar_path');
+      }
+    }
+
     setState(() {
       ipController.text = savedIp;
-      avatarPath = savedAvatar;
-      if (avatarPath != null &&
-          avatarPath!.isNotEmpty &&
-          File(avatarPath!).existsSync()) {
-        avatarFile = File(avatarPath!);
-      } else {
-        avatarFile = null;
-        avatarPath = null;
-        prefs.remove('avatar_path');
-      }
-      userAvatarPath = savedUserAvatar;
-      if (userAvatarPath != null &&
-          userAvatarPath!.isNotEmpty &&
-          File(userAvatarPath!).existsSync()) {
-        userAvatarFile = File(userAvatarPath!);
-      } else {
-        userAvatarFile = null;
-        userAvatarPath = null;
-        prefs.remove('user_avatar_path');
-      }
+      avatarPath = avatarPathToSet;
+      avatarFile = avatarFileToSet;
+      userAvatarPath = userAvatarPathToSet;
+      userAvatarFile = userAvatarFileToSet;
     });
   }
 
@@ -103,14 +114,26 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
       );
       return;
     }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('remote_ip', ipController.text);
+
+    // Salvar logo
     if (avatarPath != null) {
-      await prefs.setString('avatar_path', avatarPath!);
+      final file = File(avatarPath!);
+      if (await file.exists()) {
+        await prefs.setString('avatar_path', avatarPath!);
+      }
     }
+
+    // Salvar foto do usuário
     if (userAvatarPath != null) {
-      await prefs.setString('user_avatar_path', userAvatarPath!);
+      final file = File(userAvatarPath!);
+      if (await file.exists()) {
+        await prefs.setString('user_avatar_path', userAvatarPath!);
+      }
     }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Configurações salvas com sucesso!')),
     );
@@ -141,20 +164,36 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
               alignment: Alignment.bottomRight,
               children: [
                 Container(
-                  width: 96,
-                  height: 96,
-                  color: AppColors.lightBlue.withOpacity(0.2),
-                  child: (avatarFile != null && avatarFile!.existsSync())
-                      ? Image.file(
-                          avatarFile!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.person,
-                                size: 56, color: AppColors.lightBlue);
+                  width: 200,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.lightBlue.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: (avatarFile != null)
+                      ? FutureBuilder<bool>(
+                          future: avatarFile!.exists(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData && snapshot.data == true) {
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.file(
+                                  avatarFile!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.image,
+                                        size: 40, color: AppColors.lightBlue);
+                                  },
+                                ),
+                              );
+                            } else {
+                              return const Icon(Icons.image,
+                                  size: 40, color: AppColors.lightBlue);
+                            }
                           },
                         )
-                      : const Icon(Icons.person,
-                          size: 56, color: AppColors.lightBlue),
+                      : const Icon(Icons.image,
+                          size: 40, color: AppColors.lightBlue),
                 ),
                 Positioned(
                   bottom: 0,
@@ -175,6 +214,14 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'Logo',
+              style: TextStyle(
+                  color: AppColors.lightBlue, fontWeight: FontWeight.bold),
             ),
           ),
           const SizedBox(height: 32),
@@ -218,12 +265,10 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
                 CircleAvatar(
                   radius: 48,
                   backgroundColor: AppColors.lightBlue.withOpacity(0.2),
-                  backgroundImage:
-                      (userAvatarFile != null && userAvatarFile!.existsSync())
-                          ? FileImage(userAvatarFile!)
-                          : null,
-                  child: (userAvatarFile == null ||
-                          !(userAvatarFile!.existsSync()))
+                  backgroundImage: (userAvatarFile != null)
+                      ? FileImage(userAvatarFile!)
+                      : null,
+                  child: (userAvatarFile == null)
                       ? const Icon(Icons.account_circle,
                           size: 56, color: AppColors.lightBlue)
                       : null,
