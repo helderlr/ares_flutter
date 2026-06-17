@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 
 class ConfiguracaoPage extends StatefulWidget {
   const ConfiguracaoPage({super.key});
@@ -143,13 +144,9 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Configurações',
-          style: TextStyle(
-            color: AppColors.lightBlue,
-            fontWeight: FontWeight.bold,
-            fontSize: 26,
-          ),
+          style: AppTheme.appBarTitleStyle(color: AppColors.lightBlue),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,

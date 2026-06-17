@@ -1,232 +1,513 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/api_config.dart';
+import '../../../core/utils/jwt_helper.dart';
+import '../models/empresa_model.dart';
 import '../models/user_model.dart';
 
+class LoginResult {
+  final bool success;
+  final UserModel? usuario;
+  final List<EmpresaModel> empresas;
+  final String? token;
+  final String? message;
+
+  const LoginResult({
+    required this.success,
+    this.usuario,
+    this.empresas = const [],
+    this.token,
+    this.message,
+  });
+}
+
 class AuthService {
-  static const String baseUrl = 'https://45.162.242.43';
+  static const int sessionVersion = 2;
+  static const String _sessionVersionKey = 'session_version';
+  static const String _sessionUsuarioKey = 'session_usuario';
+  static const String _sessionEmpresaKey = 'session_empresa';
+  static const String _jwtTokenKey = 'jwt_token';
+  static const String _rememberMeKey = 'remember_me';
+  static const String _savedEmailKey = 'saved_email';
+  static const String _savedPasswordKey = 'saved_password';
 
-  /// Realiza o login do usuário
-  static Future<Map<String, dynamic>> login({
-    required String login,
-    required String senha,
-    required String nomusu,
-  }) async {
-    // URL específica que funciona
-    final url = '$baseUrl/api/Usuario/login';
+  static const String _authorizedEmpresaIdsKey = 'authorized_empresa_ids';
 
-    // Log dos dados sendo enviados
-    print('🔍 DEBUG LOGIN:');
-    print('URL: $url');
-    print('Login: $login');
-    print('Senha: $senha');
-    print('Nomusu: $nomusu');
+  static VoidCallback? onSessionExpired;
 
-    final requestBody = {
-      'nomusu': nomusu,
-      'login': login,
-      'senhaw': senha, // Mudança: enviar 'senhaw' em vez de 'senha'
-    };
+  static Future<void> migrateSessionIfNeeded() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final int storedVersion = prefs.getInt(_sessionVersionKey) ?? 0;
+    if (storedVersion >= sessionVersion) {
+      return;
+    }
+    await logout();
+    await prefs.setInt(_sessionVersionKey, sessionVersion);
+  }
 
-    print('Body JSON: ${jsonEncode(requestBody)}');
+  static String? extractTokenFromResponse(Map<String, dynamic> decoded) {
+    final dynamic rawToken = decoded['token'] ??
+        decoded['accessToken'] ??
+        decoded['access_token'] ??
+        decoded['jwt'];
+    if (rawToken == null) {
+      return null;
+    }
+    final String token = rawToken.toString().trim();
+    return token.isEmpty ? null : token;
+  }
 
-    try {
-      // Para HTTPS, usa HttpClient customizado para aceitar certificados auto-assinados
-      final httpClient = HttpClient()
-        ..badCertificateCallback = (cert, host, port) {
-          print('🔒 Aceitando certificado auto-assinado para $host:$port');
-          return true;
-        };
-
-      final request = await httpClient.postUrl(Uri.parse(url));
-      request.headers.set('Content-Type', 'application/json');
-      request.headers.set('Accept', '*/*');
-      request.write(jsonEncode(requestBody));
-
-      print('📤 Requisição enviada...');
-
-      final httpResponse = await request.close();
-      final responseBody = await httpResponse.transform(utf8.decoder).join();
-
-      print('📥 Resposta recebida:');
-      print('Status: ${httpResponse.statusCode}');
-      print('Headers: ${httpResponse.headers}');
-      print('Body: $responseBody');
-
-      if (httpResponse.statusCode == 200) {
-        final data = json.decode(responseBody);
-
-        if (data.containsKey('token') && data.containsKey('user')) {
-          final token = data['token'] as String;
-          final userData = data['user'] as Map<String, dynamic>;
-
-          print('✅ Token encontrado: ${token.substring(0, 20)}...');
-          print('✅ User data: $userData');
-
-          if (token.isNotEmpty) {
-            final user = UserModel.fromJson({
-              ...userData,
-              'login': userData['login'] ?? login,
-              'nomusu': userData['nomusu'] ?? nomusu,
-              'token': token,
-            });
-
-            print('✅ Login bem-sucedido!');
-            httpClient.close();
-            return {
-              'success': true,
-              'user': user,
-              'token': token,
-              'data': data,
-              'workingUrl': url,
-            };
-          } else {
-            print('❌ Token vazio');
-            httpClient.close();
-            return {
-              'success': false,
-              'message': 'Token vazio na resposta da API.',
-              'data': data,
-            };
-          }
-        } else {
-          print('❌ Estrutura de resposta inválida');
-          print('Esperado: campos "token" e "user"');
-          print('Encontrado: ${data.keys.toList()}');
-          httpClient.close();
-          return {
-            'success': false,
-            'message':
-                'Estrutura de resposta inválida. Esperado campos "token" e "user".',
-            'data': data,
-          };
-        }
-      } else {
-        print('❌ Erro HTTP: ${httpResponse.statusCode}');
-        httpClient.close();
-        return {
-          'success': false,
-          'message': 'Erro na API: ${httpResponse.statusCode} - $responseBody',
-          'statusCode': httpResponse.statusCode,
-        };
+  static String? extractTokenFromHeaders(http.Response response) {
+    for (final MapEntry<String, String> entry in response.headers.entries) {
+      if (entry.key.toLowerCase() != 'set-cookie') {
+        continue;
       }
-    } catch (e) {
-      print('❌ Erro de conexão: $e');
-      return {
-        'success': false,
-        'message': 'Erro de conexão: $e',
-      };
+      final RegExp cookiePattern =
+          RegExp(r'aresia_token=([^;,\s]+)', caseSensitive: false);
+      final Match? match = cookiePattern.firstMatch(entry.value);
+      if (match != null) {
+        final String token = Uri.decodeComponent(match.group(1)!);
+        return token.isEmpty ? null : token;
+      }
     }
-  }
-
-  /// Salva os dados do usuário logado
-  static Future<void> saveUserData({
-    required UserModel user,
-    bool rememberMe = false,
-    String? savedPassword,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString('jwt_token', user.token ?? '');
-    await prefs.setString('user_name', user.nome);
-    await prefs.setString('user_login', user.login);
-    if (user.codven != null) {
-      await prefs.setString('user_codven', user.codven!);
-    }
-
-    if (rememberMe && savedPassword != null) {
-      await prefs.setString('saved_login', user.login);
-      await prefs.setString('saved_password', savedPassword);
-      await prefs.setBool('remember_me', true);
-    } else {
-      await prefs.remove('saved_login');
-      await prefs.remove('saved_password');
-      await prefs.setBool('remember_me', false);
-    }
-  }
-
-  /// Verifica se o usuário está logado
-  static Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
-    return token != null && token.isNotEmpty;
-  }
-
-  /// Obtém o token salvo
-  static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('jwt_token');
-  }
-
-  /// Obtém o nome do usuário salvo
-  static Future<String?> getUserName() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_name');
-  }
-
-  /// Obtém o login do usuário salvo
-  static Future<String?> getUserLogin() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_login');
-  }
-
-  /// Obtém o código do vendedor salvo
-  static Future<String?> getUserCodven() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('user_codven');
-  }
-
-  /// Obtém o usuário completo salvo
-  static Future<UserModel?> getCurrentUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
-    final nome = prefs.getString('user_name');
-    final login = prefs.getString('user_login');
-    final codven = prefs.getString('user_codven');
-
-    if (token != null && nome != null && login != null) {
-      return UserModel(
-        login: login,
-        nome: nome,
-        codven: codven,
-        token: token,
-      );
-    }
-
     return null;
   }
 
-  /// Faz logout do usuário
-  static Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('jwt_token');
-    await prefs.remove('user_name');
-    await prefs.remove('user_login');
-    await prefs.remove('user_codven');
-    // Não remove as credenciais salvas se "Me lembre" estiver ativo
+  static String? resolveTokenFromLoginResponse({
+    required Map<String, dynamic> decoded,
+    required http.Response response,
+  }) {
+    return extractTokenFromResponse(decoded) ??
+        extractTokenFromHeaders(response);
   }
 
-  /// Obtém as credenciais salvas se "Me lembre" estiver ativo
-  static Future<Map<String, String?>> getSavedCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rememberMe = prefs.getBool('remember_me') ?? false;
+  static String mapHttpErrorMessage(int statusCode, String responseBody) {
+    if (statusCode == 502) {
+      return 'Servidor indisponível (502). O site aresia.com.br não está respondendo. '
+          'Aguarde alguns minutos ou verifique se o servidor está no ar.';
+    }
+    if (statusCode == 503) {
+      return 'Serviço temporariamente indisponível (503). Tente novamente em instantes.';
+    }
+    if (statusCode == 401) {
+      return 'E-mail ou senha incorretos.';
+    }
+    if (statusCode >= 500) {
+      return 'Erro no servidor ($statusCode). Tente novamente mais tarde.';
+    }
+    if (responseBody.contains('502')) {
+      return 'Servidor indisponível. Verifique se aresia.com.br está no ar.';
+    }
+    return 'Erro na API ($statusCode). Verifique sua conexão e tente novamente.';
+  }
 
-    if (rememberMe) {
+  static Map<String, dynamic>? tryDecodeJson(String responseBody) {
+    if (responseBody.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final dynamic decoded = json.decode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<LoginResult> login({
+    required String email,
+    required String senha,
+  }) async {
+    try {
+      final http.Response response = await http
+          .post(
+            Uri.parse(ApiConfig.loginUrl),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'email': email.trim(),
+              'senha': senha,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+      final Map<String, dynamic>? decoded = tryDecodeJson(response.body);
+      if (response.statusCode != 200 || decoded == null) {
+        final String apiError = decoded?['error']?.toString() ?? '';
+        final String message = apiError.isNotEmpty
+            ? apiError
+            : mapHttpErrorMessage(response.statusCode, response.body);
+        return LoginResult(success: false, message: message);
+      }
+      if (decoded['ok'] != true) {
+        return LoginResult(
+          success: false,
+          message: decoded['error']?.toString() ?? 'Login inválido',
+        );
+      }
+      final Map<String, dynamic>? usuarioJson =
+          decoded['usuario'] as Map<String, dynamic>?;
+      if (usuarioJson == null) {
+        return const LoginResult(
+          success: false,
+          message: 'Resposta inválida: usuário não encontrado',
+        );
+      }
+      final String? token = resolveTokenFromLoginResponse(
+        decoded: decoded,
+        response: response,
+      );
+      final UserModel usuario = UserModel.fromJson({
+        ...usuarioJson,
+        if (token != null) 'token': token,
+      });
+      final List<EmpresaModel> empresas = (decoded['empresas'] as List<dynamic>?)
+              ?.map((dynamic item) =>
+                  EmpresaModel.fromJson(item as Map<String, dynamic>))
+              .toList() ??
+          [];
+      return LoginResult(
+        success: true,
+        usuario: usuario,
+        empresas: empresas,
+        token: token,
+      );
+    } catch (error) {
+      final String errorText = error.toString();
+      if (errorText.contains('TimeoutException') ||
+          errorText.contains('timed out')) {
+        return const LoginResult(
+          success: false,
+          message:
+              'Tempo esgotado ao conectar com o servidor. Verifique sua internet '
+              'ou se aresia.com.br está no ar.',
+        );
+      }
+      if (errorText.contains('SocketException') ||
+          errorText.contains('Failed host lookup')) {
+        return const LoginResult(
+          success: false,
+          message:
+              'Sem conexão com o servidor. Verifique sua internet e tente novamente.',
+        );
+      }
+      return LoginResult(
+        success: false,
+        message: 'Erro de conexão. Verifique se aresia.com.br está acessível.',
+      );
+    }
+  }
+
+  static String? validateEmpresaAccess({
+    required String empresaId,
+    required List<EmpresaModel> empresasFromLogin,
+    required String? token,
+  }) {
+    final bool isInLoginList =
+        empresasFromLogin.any((EmpresaModel empresa) => empresa.id == empresaId);
+    if (!isInLoginList) {
+      return 'Empresa não vinculada a este usuário (usuario_empresa).';
+    }
+    if (token != null &&
+        token.isNotEmpty &&
+        ApiConfig.jwtRequired &&
+        !JwtHelper.isEmpresaAuthorized(token, empresaId)) {
+      return 'Empresa não autorizada no token JWT.';
+    }
+    return null;
+  }
+
+  static Future<void> saveSession({
+    required UserModel usuario,
+    required EmpresaModel empresa,
+    required List<EmpresaModel> empresasFromLogin,
+    String? token,
+    bool rememberMe = false,
+    String? savedEmail,
+    String? savedPassword,
+  }) async {
+    final String? accessError = validateEmpresaAccess(
+      empresaId: empresa.id,
+      empresasFromLogin: empresasFromLogin,
+      token: token,
+    );
+    if (accessError != null) {
+      throw Exception(accessError);
+    }
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? sessionToken = token ?? usuario.token;
+    final String? refEmpresaId = UserModel.extractEmpresaIdFromRef(usuario.id);
+    final int? refCodusu = UserModel.extractCodusuFromRef(usuario.id);
+    final int? sessionCodusu = empresa.codusu ??
+        usuario.codusu ??
+        (refEmpresaId == empresa.id ? refCodusu : null);
+    final UserModel usuarioToSave = sessionCodusu != null
+        ? usuario.copyWith(codusu: sessionCodusu)
+        : usuario;
+    await prefs.setString(_sessionUsuarioKey, jsonEncode(usuarioToSave.toJson()));
+    await prefs.setString(_sessionEmpresaKey, jsonEncode(empresa.toJson()));
+    await prefs.setString('user_name', usuario.nome);
+    await prefs.setString('user_email', usuario.email);
+    await prefs.setInt(_sessionVersionKey, sessionVersion);
+    if (sessionToken != null && sessionToken.isNotEmpty) {
+      await prefs.setString(_jwtTokenKey, sessionToken);
+      final List<String> authorizedIds =
+          JwtHelper.extractEmpresaIds(sessionToken);
+      if (authorizedIds.isNotEmpty) {
+        await prefs.setStringList(_authorizedEmpresaIdsKey, authorizedIds);
+      }
+    } else {
+      final List<String> idsFromLogin =
+          empresasFromLogin.map((EmpresaModel item) => item.id).toList();
+      await prefs.setStringList(_authorizedEmpresaIdsKey, idsFromLogin);
+    }
+    if (rememberMe && savedEmail != null && savedPassword != null) {
+      await prefs.setString(_savedEmailKey, savedEmail);
+      await prefs.setString(_savedPasswordKey, savedPassword);
+      await prefs.setBool(_rememberMeKey, true);
+    } else {
+      await prefs.remove(_savedEmailKey);
+      await prefs.remove(_savedPasswordKey);
+      await prefs.setBool(_rememberMeKey, false);
+    }
+  }
+
+  static Future<bool> isLoggedIn() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? usuarioJson = prefs.getString(_sessionUsuarioKey);
+    final String? empresaJson = prefs.getString(_sessionEmpresaKey);
+    final bool hasSession = usuarioJson != null &&
+        usuarioJson.isNotEmpty &&
+        empresaJson != null &&
+        empresaJson.isNotEmpty;
+    if (!hasSession) {
+      return false;
+    }
+    if (!ApiConfig.jwtRequired) {
+      return true;
+    }
+    final String? token = prefs.getString(_jwtTokenKey);
+    return token != null && token.isNotEmpty;
+  }
+
+  static Future<String?> getToken() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_jwtTokenKey);
+  }
+
+  static Future<String> requireToken() async {
+    final String? token = await getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception(
+        'Token JWT não encontrado. Faça login novamente.',
+      );
+    }
+    return token;
+  }
+
+  static Future<Map<String, String>> buildAuthHeaders() async {
+    final Map<String, String> headers = const {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    final String? token = await getToken();
+    if (token != null && token.isNotEmpty) {
       return {
-        'login': prefs.getString('saved_login'),
-        'password': prefs.getString('saved_password'),
+        ...headers,
+        'Authorization': 'Bearer $token',
       };
     }
-
-    return {'login': null, 'password': null};
+    if (ApiConfig.jwtRequired) {
+      throw Exception(
+        'Token JWT não encontrado. Faça login novamente.',
+      );
+    }
+    return headers;
   }
 
-  /// Valida se o token ainda é válido (opcional - pode ser implementado no futuro)
-  static Future<bool> validateToken() async {
-    // Implementação futura para validar token com a API
-    // Por enquanto, apenas verifica se existe
-    final token = await getToken();
-    return token != null && token.isNotEmpty;
+  static Future<void> handleSessionExpired() async {
+    await logout();
+    onSessionExpired?.call();
+  }
+
+  static Future<bool> validateTokenWithServer({bool silent = false}) async {
+    if (!ApiConfig.jwtRequired) {
+      return true;
+    }
+    final String? token = await getToken();
+    if (token == null || token.isEmpty) {
+      return false;
+    }
+    try {
+      final http.Response response = await http
+          .get(
+            Uri.parse(ApiConfig.meUrl),
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return true;
+      }
+      if (response.statusCode == 401) {
+        if (silent) {
+          await logout();
+        } else {
+          await handleSessionExpired();
+        }
+      }
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<int?> getCurrentCodusu() async {
+    final UserModel? user = await getCurrentUser();
+    if (user == null) {
+      return null;
+    }
+    if (user.codusu != null && user.codusu! > 0) {
+      return user.codusu;
+    }
+    final EmpresaModel? empresa = await getCurrentEmpresa();
+    if (empresa?.codusu != null && empresa!.codusu! > 0) {
+      return empresa.codusu;
+    }
+    final String? empresaId = await getEmpresaId();
+    final String? refEmpresaId = UserModel.extractEmpresaIdFromRef(user.id);
+    final int? refCodusu = UserModel.extractCodusuFromRef(user.id);
+    if (empresaId != null &&
+        refEmpresaId == empresaId &&
+        refCodusu != null) {
+      return refCodusu;
+    }
+    return null;
+  }
+
+  static Future<String?> getUserName() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_name');
+  }
+
+  static Future<String?> getUserEmail() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_email');
+  }
+
+  static Future<UserModel?> getCurrentUser() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? usuarioJson = prefs.getString(_sessionUsuarioKey);
+    if (usuarioJson == null || usuarioJson.isEmpty) {
+      return null;
+    }
+    return UserModel.fromJson(
+      jsonDecode(usuarioJson) as Map<String, dynamic>,
+    );
+  }
+
+  static Future<EmpresaModel?> getCurrentEmpresa() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? empresaJson = prefs.getString(_sessionEmpresaKey);
+    if (empresaJson == null || empresaJson.isEmpty) {
+      return null;
+    }
+    return EmpresaModel.fromJson(
+      jsonDecode(empresaJson) as Map<String, dynamic>,
+    );
+  }
+
+  static Future<String?> getEmpresaId() async {
+    final EmpresaModel? empresa = await getCurrentEmpresa();
+    return empresa?.id;
+  }
+
+  static Future<String> requireEmpresaId() async {
+    final String? empresaId = await getEmpresaId();
+    if (empresaId == null || empresaId.isEmpty) {
+      throw Exception(
+        'Empresa não selecionada. Faça login novamente.',
+      );
+    }
+    final bool isAuthorized = await isCurrentEmpresaAuthorized();
+    if (!isAuthorized) {
+      await handleSessionExpired();
+      throw Exception('Empresa não autorizada. Faça login novamente.');
+    }
+    return empresaId;
+  }
+
+  static Future<bool> isCurrentEmpresaAuthorized() async {
+    final String? empresaId = await getEmpresaId();
+    if (empresaId == null || empresaId.isEmpty) {
+      return false;
+    }
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> authorizedIds =
+        prefs.getStringList(_authorizedEmpresaIdsKey) ?? <String>[];
+    if (authorizedIds.isEmpty) {
+      return true;
+    }
+    return authorizedIds.contains(empresaId);
+  }
+
+  static Future<void> repairSessionCodusuIfNeeded() async {
+    final UserModel? user = await getCurrentUser();
+    final EmpresaModel? empresa = await getCurrentEmpresa();
+    if (user == null || empresa == null) {
+      return;
+    }
+    final bool hasCodusu = (user.codusu != null && user.codusu! > 0) ||
+        (empresa.codusu != null && empresa.codusu! > 0);
+    if (hasCodusu) {
+      return;
+    }
+    final String? refEmpresaId = UserModel.extractEmpresaIdFromRef(user.id);
+    final int? refCodusu = UserModel.extractCodusuFromRef(user.id);
+    if (refEmpresaId != empresa.id || refCodusu == null || refCodusu <= 0) {
+      return;
+    }
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _sessionUsuarioKey,
+      jsonEncode(user.copyWith(codusu: refCodusu).toJson()),
+    );
+    await prefs.setString(
+      _sessionEmpresaKey,
+      jsonEncode(EmpresaModel(
+        id: empresa.id,
+        nome: empresa.nome,
+        cnpj: empresa.cnpj,
+        logomarcaUrl: empresa.logomarcaUrl,
+        codusu: refCodusu,
+      ).toJson()),
+    );
+  }
+
+  static Future<void> logout() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionUsuarioKey);
+    await prefs.remove(_sessionEmpresaKey);
+    await prefs.remove(_jwtTokenKey);
+    await prefs.remove(_authorizedEmpresaIdsKey);
+    await prefs.remove('user_name');
+    await prefs.remove('user_email');
+  }
+
+  static Future<Map<String, String?>> getSavedCredentials() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final bool rememberMe = prefs.getBool(_rememberMeKey) ?? false;
+    if (!rememberMe) {
+      return {'email': null, 'password': null};
+    }
+    return {
+      'email': prefs.getString(_savedEmailKey),
+      'password': prefs.getString(_savedPasswordKey),
+    };
   }
 }

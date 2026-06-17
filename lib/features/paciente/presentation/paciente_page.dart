@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../services/paciente_service_paginado.dart';
+import 'consulta_paciente_page.dart';
+import 'paciente_form_page.dart';
 
 class PacientePage extends StatefulWidget {
   const PacientePage({super.key});
@@ -88,7 +92,7 @@ class _PacientePageState extends State<PacientePage> {
       print('❌ Erro ao carregar primeira página: $e');
       print('🔄 Definindo _isLoading = false (erro)');
       setState(() => _isLoading = false);
-      _showErrorSnackBar('Erro ao carregar pacientes: $e');
+      _handleError(e);
     }
   }
 
@@ -118,7 +122,7 @@ class _PacientePageState extends State<PacientePage> {
     } catch (e) {
       print('❌ Erro ao carregar próxima página: $e');
       setState(() => _isLoadingMore = false);
-      _showErrorSnackBar('Erro ao carregar mais pacientes: $e');
+      _handleError(e);
     }
   }
 
@@ -158,6 +162,28 @@ class _PacientePageState extends State<PacientePage> {
     });
   }
 
+  void _handleError(dynamic error) {
+    // Para erros de "nenhum resultado encontrado", não mostra SnackBar
+    // Apenas deixa a interface mostrar "Nenhum paciente encontrado"
+    if (error.toString().contains('404') ||
+        error.toString().contains('Nenhum paciente encontrado')) {
+      // Não faz nada - deixa a interface mostrar a mensagem amigável
+      return;
+    }
+
+    // Para outros erros críticos, mostra mensagem amigável
+    String userMessage;
+    if (error.toString().contains('401')) {
+      userMessage = 'Sessão expirada. Faça login novamente.';
+    } else if (error.toString().contains('Erro de conexão')) {
+      userMessage = 'Problema de conexão. Verifique sua internet.';
+    } else {
+      userMessage = 'Erro ao carregar dados. Tente novamente.';
+    }
+
+    _showErrorSnackBar(userMessage);
+  }
+
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -172,13 +198,7 @@ class _PacientePageState extends State<PacientePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Pacientes',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 26,
-          ),
-        ),
+        title: const Text('Pacientes'),
         centerTitle: true,
         backgroundColor: AppColors.lightBlue,
         elevation: 0,
@@ -205,6 +225,9 @@ class _PacientePageState extends State<PacientePage> {
               child: TextField(
                 controller: _searchController,
                 textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  UpperCaseTextFormatter(),
+                ],
                 onChanged: (value) {
                   print('🔍 onChanged chamado com: "$value"');
                   _onSearchChanged();
@@ -248,17 +271,6 @@ class _PacientePageState extends State<PacientePage> {
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            if (_currentSearchQuery.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'Tente buscar por outro termo',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
                           ],
                         ),
                       )
@@ -295,7 +307,11 @@ class _PacientePageState extends State<PacientePage> {
             IconButton(
               icon: const Icon(Icons.add, color: Colors.white, size: 28),
               onPressed: () {
-                // ação de adicionar paciente
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PacienteFormPage(),
+                  ),
+                );
               },
             ),
           ],
@@ -304,80 +320,62 @@ class _PacientePageState extends State<PacientePage> {
     );
   }
 
-  Widget _buildLoadMoreIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          SizedBox(width: 16),
-          Text(
-            'Carregando mais pacientes...',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPatientItem(Patient patient) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      child: Row(
-        children: [
-          // Ícone do paciente
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.lightBlue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ConsultaPacientePage(paciente: patient),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        child: Row(
+          children: [
+            // Ícone do paciente
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.lightBlue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.person,
+                color: AppColors.lightBlue,
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              Icons.person,
-              color: AppColors.lightBlue,
+            const SizedBox(width: 16),
+            // Informações do paciente
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nome do paciente
+                  Text(
+                    patient.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTheme.listItemTitleStyle,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Nascimento: ${_formatDate(patient.birthDate)}',
+                    style: AppTheme.listItemSubtitleStyle,
+                  ),
+                ],
+              ),
+            ),
+            // Seta de navegação
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.grey,
               size: 24,
             ),
-          ),
-          const SizedBox(width: 16),
-          // Informações do paciente
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Nome do paciente
-                Text(
-                  patient.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Data de nascimento
-                Text(
-                  'Nascimento: ${_formatDate(patient.birthDate)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Seta de navegação
-          const Icon(
-            Icons.chevron_right,
-            color: Colors.grey,
-            size: 24,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -416,5 +414,18 @@ String _formatDate(String date) {
     return cleanDate;
   } catch (e) {
     return 'Data inválida';
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
   }
 }

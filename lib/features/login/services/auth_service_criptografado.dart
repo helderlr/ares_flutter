@@ -11,11 +11,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/api_config.dart';
 import '../../../core/services/encryption_service.dart';
 import '../models/user_model.dart';
 
 class AuthServiceCriptografado {
-  static const String baseUrl = 'https://45.162.242.43';
   static const String _chaveCriptografia = 'ARES_FLUTTER_2025';
 
   /// Realiza o login do usuário com criptografia AES
@@ -36,7 +36,7 @@ class AuthServiceCriptografado {
           '📝 Processo: usuário digita "$senha" → sistema criptografa → "$senhaCriptografada"');
 
       // 2. Fazer login diretamente na API com senha criptografada
-      final url = '$baseUrl/api/Usuario/login';
+      final url = ApiConfig.loginUrl;
       final requestBody = {
         'login': login,
         'senhaw': senhaCriptografada, // Campo com senha criptografada
@@ -170,7 +170,7 @@ class AuthServiceCriptografado {
       final httpClient = HttpClient()
         ..badCertificateCallback = (cert, host, port) => true;
 
-      final uri = Uri.parse('$baseUrl/api/Usuario/buscar_por_login/$login');
+      final uri = Uri.parse('${ApiConfig.apiUrl}/Usuario/buscar_por_login/$login');
       final request = await httpClient.getUrl(uri);
 
       request.headers.set('Accept', '*/*');
@@ -204,7 +204,7 @@ class AuthServiceCriptografado {
       final httpClient = HttpClient()
         ..badCertificateCallback = (cert, host, port) => true;
 
-      final uri = Uri.parse('$baseUrl/api/Usuario/gerar_token');
+      final uri = Uri.parse('${ApiConfig.apiUrl}/Usuario/gerar_token');
       final request = await httpClient.postUrl(uri);
 
       request.headers.set('Accept', '*/*');

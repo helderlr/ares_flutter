@@ -34,6 +34,8 @@ android {
 
     kotlinOptions {
         jvmTarget = '1.8'
+        languageVersion = '1.9'
+        apiVersion = '1.9'
     }
 
     sourceSets {
@@ -64,4 +66,7 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    implementation 'com.google.android.gms:play-services-location:21.1.0'
+}

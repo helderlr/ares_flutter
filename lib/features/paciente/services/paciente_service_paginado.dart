@@ -1,42 +1,90 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/config/api_config.dart';
+import '../../../core/services/http_request_helper.dart';
+import '../../../core/services/unauthorized_exception.dart';
+import '../../login/services/auth_service.dart';
 
 class Patient {
-  final int id;
-  final String name;
-  final String birthDate;
-  final String planCardNumber;
+  final int codpac;
+  final String nompac;
+  final String? datnas;
+  final String? carteira;
+  final int? codUsu;
 
   const Patient({
-    required this.id,
-    required this.name,
-    required this.birthDate,
-    required this.planCardNumber,
+    required this.codpac,
+    required this.nompac,
+    this.datnas,
+    this.carteira,
+    this.codUsu,
   });
 
-  factory Patient.fromJson(Map<String, dynamic> json) {
-    final codigo = json['codpac'] ?? json['codigo'];
-    final nome = json['nompac'] ?? json['nome'];
-    final dataNascimento = json['datnas'] ?? json['dataNascimento'];
-    final carteira = json['carteira'];
+  int get id => codpac;
+  String get name => nompac;
+  String get birthDate => datnas ?? 'Data não disponível';
+  String get planCardNumber => carteira ?? 'Carteira não disponível';
 
+  bool canEditByUser(int? loggedCodusu) {
+    if (loggedCodusu == null || codUsu == null) {
+      return false;
+    }
+    return codUsu == loggedCodusu;
+  }
+
+  factory Patient.fromJson(Map<String, dynamic> json) {
+    final dynamic codigo = json['codpac'] ?? json['codigo'];
+    final dynamic nome = json['nompac'] ?? json['nome'];
+    final dynamic dataNascimento = json['datnas'] ?? json['dataNascimento'];
+    final dynamic carteira = json['carteira'] ?? json['carpac'];
     return Patient(
-      id: codigo is int
+      codpac: codigo is int
           ? codigo
           : (codigo is String ? int.tryParse(codigo) ?? 0 : 0),
-      name: nome is String && nome.isNotEmpty
+      nompac: nome is String && nome.isNotEmpty
           ? nome
           : 'Paciente ${codigo ?? 'N/A'}',
-      birthDate: dataNascimento is String &&
+      datnas: dataNascimento is String &&
               dataNascimento.isNotEmpty &&
               dataNascimento != 'null'
           ? dataNascimento
-          : 'Data não disponível',
-      planCardNumber: carteira is String && carteira.isNotEmpty
-          ? carteira
-          : 'Carteira não disponível',
+          : null,
+      carteira: carteira is String && carteira.isNotEmpty ? carteira : null,
+      codUsu: _parseCodUsu(json['cod_usu'] ?? json['codusu'] ?? json['COD_USU']),
+    );
+  }
+
+  static int? _parseCodUsu(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'codpac': codpac,
+      'nompac': nompac,
+      'datnas': datnas,
+      'carteira': carteira,
+      'cod_usu': codUsu,
+    };
+  }
+
+  Patient copyWith({
+    int? codpac,
+    String? nompac,
+    String? datnas,
+    String? carteira,
+    int? codUsu,
+  }) {
+    return Patient(
+      codpac: codpac ?? this.codpac,
+      nompac: nompac ?? this.nompac,
+      datnas: datnas ?? this.datnas,
+      carteira: carteira ?? this.carteira,
+      codUsu: codUsu ?? this.codUsu,
     );
   }
 }
@@ -135,7 +183,6 @@ class PaginatedResponse {
 }
 
 class PatientServicePaginado {
-  static const String baseUrl = 'https://45.162.242.43';
 
   Future<PaginatedResponse> fetchPatientsPaginated({
     required int page,
@@ -175,42 +222,26 @@ class PatientServicePaginado {
       print('🔍 Query params atualizados: $queryParams');
     }
 
-    final uri = Uri.parse('$baseUrl/api/Paciente/paginated')
-        .replace(queryParameters: queryParams);
-    final url = uri.toString();
+    final Map<String, String> paramsWithEmpresa =
+        await HttpRequestHelper.withEmpresaId(queryParams);
+    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/paciente')
+        .replace(queryParameters: paramsWithEmpresa);
 
     print('🔍 DEBUG PAGINAÇÃO:');
-    print('URL: $url');
-    print('Página: $page, Tamanho: $pageSize');
-    print('Ordenação: $sortBy $sortOrder');
-    print('Busca: $searchQuery');
-    print('📋 Parâmetros enviados: $queryParams');
+    print('URL: $uri');
+    print('📋 Parâmetros enviados: $paramsWithEmpresa');
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
-
-    if (token == null || token.isEmpty) {
-      throw Exception(
-          'Token de autenticação não encontrado. Faça login novamente.');
-    }
-
+    final HttpClient httpClient = HttpRequestHelper.createClient();
     try {
-      final httpClient = HttpClient()
-        ..badCertificateCallback = (cert, host, port) => true;
-
-      final request = await httpClient.getUrl(uri);
-      request.headers.set('Accept', '*/*');
-      request.headers.set('Authorization', 'Bearer $token');
-      request.headers.set('Content-Type', 'application/json');
-
-      final httpResponse = await request.close();
-      final responseBody = await httpResponse.transform(utf8.decoder).join();
-
+      final HttpClientRequest request = await httpClient.getUrl(uri);
+      await HttpRequestHelper.applyJsonHeaders(request);
+      final HttpClientResponse httpResponse = await request.close();
+      final String responseBody =
+          await httpResponse.transform(utf8.decoder).join();
       print('📥 Resposta recebida:');
       print('Status: ${httpResponse.statusCode}');
-
       if (httpResponse.statusCode == 200) {
-        final data = json.decode(responseBody);
+        final dynamic data = HttpRequestHelper.decodeResponse(responseBody);
         print('✅ Dados paginados recebidos');
         print('Tipo de resposta: ${data.runtimeType}');
 
@@ -245,8 +276,8 @@ class PatientServicePaginado {
         return response;
       } else if (httpResponse.statusCode == 401) {
         httpClient.close();
-        throw Exception(
-            'Token de autenticação inválido ou expirado. Faça login novamente.');
+        await AuthService.handleSessionExpired();
+        throw const UnauthorizedException();
       } else {
         httpClient.close();
         throw Exception(

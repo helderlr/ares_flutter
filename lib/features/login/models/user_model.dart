@@ -1,91 +1,97 @@
 class UserModel {
-  final String login;
+  final String id;
   final String nome;
-  final String? codven;
+  final String email;
   final String? token;
+  final String? login;
+  final String? codven;
   final int? codusu;
-  final String? senhaw;
-  final String? admsis;
-  final DateTime? datcad;
 
   const UserModel({
-    required this.login,
+    required this.id,
     required this.nome,
-    this.codven,
+    required this.email,
     this.token,
+    this.login,
+    this.codven,
     this.codusu,
-    this.senhaw,
-    this.admsis,
-    this.datcad,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      login: json['login'] ?? '',
-      nome: json['nomusu'] ?? json['nome'] ?? '',
-      codven: json['codven'],
-      token: json['token'] ??
-          json['accessToken'] ??
-          json['jwt'] ??
-          json['access_token'],
-      codusu: json['codusu'],
-      senhaw: json['senhaw'],
-      admsis: json['admsis'],
-      datcad: json['datcad'] != null ? DateTime.tryParse(json['datcad']) : null,
+      id: json['id']?.toString() ?? '',
+      nome: json['nome']?.toString() ?? json['nomusu']?.toString() ?? '',
+      email: json['email']?.toString() ?? json['login']?.toString() ?? '',
+      token: json['token']?.toString() ??
+          json['accessToken']?.toString() ??
+          json['jwt']?.toString(),
+      login: json['login']?.toString(),
+      codven: json['codven']?.toString(),
+      codusu: json['codusu'] is int
+          ? json['codusu'] as int
+          : int.tryParse(json['codusu']?.toString() ?? ''),
     );
+  }
+
+  static String? extractEmpresaIdFromRef(String userRef) {
+    final int separatorIndex = userRef.lastIndexOf('~');
+    if (separatorIndex <= 0) {
+      return null;
+    }
+    return userRef.substring(0, separatorIndex);
+  }
+
+  static int? extractCodusuFromRef(String userRef) {
+    final int separatorIndex = userRef.lastIndexOf('~');
+    if (separatorIndex < 0 || separatorIndex >= userRef.length - 1) {
+      return null;
+    }
+    return int.tryParse(userRef.substring(separatorIndex + 1));
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'login': login,
-      'nomusu': nome,
-      'codven': codven,
-      'token': token,
-      'codusu': codusu,
-      'senhaw': senhaw,
-      'admsis': admsis,
-      'datcad': datcad?.toIso8601String(),
+      'id': id,
+      'nome': nome,
+      'email': email,
+      if (token != null) 'token': token,
+      if (login != null) 'login': login,
+      if (codven != null) 'codven': codven,
+      if (codusu != null) 'codusu': codusu,
     };
   }
 
   UserModel copyWith({
-    String? login,
+    String? id,
     String? nome,
-    String? codven,
+    String? email,
     String? token,
+    String? login,
+    String? codven,
     int? codusu,
-    String? senhaw,
-    String? admsis,
-    DateTime? datcad,
   }) {
     return UserModel(
-      login: login ?? this.login,
+      id: id ?? this.id,
       nome: nome ?? this.nome,
-      codven: codven ?? this.codven,
+      email: email ?? this.email,
       token: token ?? this.token,
+      login: login ?? this.login,
+      codven: codven ?? this.codven,
       codusu: codusu ?? this.codusu,
-      senhaw: senhaw ?? this.senhaw,
-      admsis: admsis ?? this.admsis,
-      datcad: datcad ?? this.datcad,
     );
   }
 
   @override
   String toString() {
-    return 'UserModel(login: $login, nome: $nome, codusu: $codusu, admsis: $admsis)';
+    return 'UserModel(id: $id, nome: $nome, email: $email)';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
-    return other is UserModel &&
-        other.login == login &&
-        other.nome == nome &&
-        other.codusu == codusu;
+    return other is UserModel && other.id == id && other.email == email;
   }
 
   @override
-  int get hashCode {
-    return login.hashCode ^ nome.hashCode ^ codusu.hashCode;
-  }
+  int get hashCode => id.hashCode ^ email.hashCode;
 }
