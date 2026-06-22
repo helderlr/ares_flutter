@@ -157,6 +157,7 @@ class _LoginPageState extends State<LoginPage> {
         savedEmail: emailController.text.trim(),
         savedPassword: passController.text,
       );
+      await AuthService.repairSessionCodusuIfNeeded();
       await AcessoLogService.registerLoginAccess();
       if (mounted) {
         widget.onLogin(pendingLogin!.usuario!.nome);
@@ -280,11 +281,14 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final double bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomInset),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: Form(
             key: formKey,
             child: Column(
@@ -442,7 +446,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ],
                 ),
-                const Spacer(),
+                const SizedBox(height: 20),
                 Align(
                   alignment: Alignment.centerRight,
                   child: SizedBox(
@@ -498,6 +502,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
               ],
             ),
           ),

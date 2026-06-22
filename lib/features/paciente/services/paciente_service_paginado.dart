@@ -1,10 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../../core/config/api_config.dart';
-import '../../../core/services/http_request_helper.dart';
+import '../../../core/services/paginated_api_helper.dart';
 import '../../../core/services/unauthorized_exception.dart';
-import '../../login/services/auth_service.dart';
 
 class Patient {
   final int codpac;
@@ -191,98 +187,29 @@ class PatientServicePaginado {
     String? sortOrder,
     String? searchQuery,
   }) async {
-    final queryParams = <String, String>{
-      'PageNumber': page.toString(),
-      'PageSize': pageSize.toString(),
-    };
-
-    if (sortBy != null) {
-      // Mapeia os campos para os nomes corretos da API
-      String orderByField;
-      switch (sortBy) {
-        case 'name':
-          orderByField = 'nompac';
-          break;
-        case 'id':
-          orderByField = 'codpac';
-          break;
-        case 'birthDate':
-          orderByField = 'datnas';
-          break;
-        default:
-          orderByField = 'nompac';
-      }
-      queryParams['OrderBy'] = '$orderByField ${sortOrder ?? 'asc'}';
-      print('📊 Ordenação configurada: $orderByField ${sortOrder ?? 'asc'}');
-    }
-    if (searchQuery != null && searchQuery.isNotEmpty) {
-      // Usa o parâmetro correto da API: NOMPAC
-      queryParams['NOMPAC'] = searchQuery;
-      print('🔍 Parâmetro de busca adicionado: NOMPAC=$searchQuery');
-      print('🔍 Query params atualizados: $queryParams');
-    }
-
-    final Map<String, String> paramsWithEmpresa =
-        await HttpRequestHelper.withEmpresaId(queryParams);
-    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/paciente')
-        .replace(queryParameters: paramsWithEmpresa);
-
-    print('🔍 DEBUG PAGINAÇÃO:');
-    print('URL: $uri');
-    print('📋 Parâmetros enviados: $paramsWithEmpresa');
-
-    final HttpClient httpClient = HttpRequestHelper.createClient();
     try {
-      final HttpClientRequest request = await httpClient.getUrl(uri);
-      await HttpRequestHelper.applyJsonHeaders(request);
-      final HttpClientResponse httpResponse = await request.close();
-      final String responseBody =
-          await httpResponse.transform(utf8.decoder).join();
-      print('📥 Resposta recebida:');
-      print('Status: ${httpResponse.statusCode}');
-      if (httpResponse.statusCode == 200) {
-        final dynamic data = HttpRequestHelper.decodeResponse(responseBody);
-        print('✅ Dados paginados recebidos');
-        print('Tipo de resposta: ${data.runtimeType}');
-
-        PaginatedResponse response;
-
-        // Verifica se é uma lista direta ou objeto com data/pagination
-        if (data is List) {
-          print('📋 API retornou lista direta com ${data.length} pacientes');
-          response = PaginatedResponse.fromList(data);
-        } else if (data is Map<String, dynamic>) {
-          print('📋 API retornou objeto com data e pagination');
-          response = PaginatedResponse.fromJson(data);
-        } else {
-          throw Exception(
-              'Formato de resposta inesperado: ${data.runtimeType}');
-        }
-
-        print(
-            '📊 Página ${response.pagination.currentPage} de ${response.pagination.totalPages}');
-        print('📋 ${response.patients.length} pacientes nesta página');
-        print('📈 Total de registros: ${response.pagination.totalRecords}');
-        if (searchQuery != null && searchQuery.isNotEmpty) {
-          print(
-              '🔍 Busca por "$searchQuery" retornou ${response.patients.length} resultados');
-          if (response.patients.isNotEmpty) {
-            print(
-                '📝 Primeiros resultados: ${response.patients.take(3).map((p) => p.name).join(', ')}');
-          }
-        }
-
-        httpClient.close();
-        return response;
-      } else if (httpResponse.statusCode == 401) {
-        httpClient.close();
-        await AuthService.handleSessionExpired();
-        throw const UnauthorizedException();
-      } else {
-        httpClient.close();
-        throw Exception(
-            'Erro na API: ${httpResponse.statusCode} - $responseBody');
-      }
+      final PaginatedApiDecoded decoded = await PaginatedApiHelper.fetchPage(
+        menuPath: '/menu/paciente',
+        queryParams: PaginatedApiHelper.buildListQuery(
+          page: page,
+          pageSize: pageSize,
+          sortBy: sortBy ?? 'name',
+          sortOrder: sortOrder ?? 'asc',
+          search: searchQuery,
+        ),
+      );
+      final List<Patient> patients = decoded.data
+          .map(
+            (dynamic item) =>
+                Patient.fromJson(item as Map<String, dynamic>),
+          )
+          .toList();
+      return PaginatedResponse(
+        patients: patients,
+        pagination: PaginationInfo.fromJson(decoded.pagination),
+      );
+    } on UnauthorizedException {
+      rethrow;
     } catch (e) {
       throw Exception('Erro de conexão: $e');
     }

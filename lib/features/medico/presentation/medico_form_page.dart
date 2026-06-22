@@ -101,15 +101,16 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
       return;
     }
     if (_especialidadesParaSelecao.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _especialidadesError ??
-                'Nenhuma especialidade cadastrada para esta empresa.',
+      if (_especialidadesError == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nenhuma especialidade cadastrada para esta empresa.',
+            ),
+            backgroundColor: Colors.orange,
           ),
-          backgroundColor: Colors.orange,
-        ),
-      );
+        );
+      }
       return;
     }
     final int? selected = await showModalBottomSheet<int?>(
@@ -441,7 +442,7 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
             const SizedBox(height: 8),
             Text(
               _especialidadesError!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+              style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
             ),
             TextButton(
               onPressed: _loadEspecialidades,

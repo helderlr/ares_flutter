@@ -244,11 +244,21 @@ class AuthService {
     final int? sessionCodusu = empresa.codusu ??
         usuario.codusu ??
         (refEmpresaId == empresa.id ? refCodusu : null);
-    final UserModel usuarioToSave = sessionCodusu != null
-        ? usuario.copyWith(codusu: sessionCodusu)
-        : usuario;
+    final int? sessionCodven = empresa.codven ?? _parseCodven(usuario.codven);
+    final UserModel usuarioToSave = usuario.copyWith(
+      codusu: sessionCodusu,
+      codven: sessionCodven?.toString(),
+    );
+    final EmpresaModel empresaToSave = EmpresaModel(
+      id: empresa.id,
+      nome: empresa.nome,
+      cnpj: empresa.cnpj,
+      logomarcaUrl: empresa.logomarcaUrl,
+      codusu: sessionCodusu,
+      codven: sessionCodven,
+    );
     await prefs.setString(_sessionUsuarioKey, jsonEncode(usuarioToSave.toJson()));
-    await prefs.setString(_sessionEmpresaKey, jsonEncode(empresa.toJson()));
+    await prefs.setString(_sessionEmpresaKey, jsonEncode(empresaToSave.toJson()));
     await prefs.setString('user_name', usuario.nome);
     await prefs.setString('user_email', usuario.email);
     await prefs.setInt(_sessionVersionKey, sessionVersion);
@@ -320,11 +330,6 @@ class AuthService {
         'Authorization': 'Bearer $token',
       };
     }
-    if (ApiConfig.jwtRequired) {
-      throw Exception(
-        'Token JWT não encontrado. Faça login novamente.',
-      );
-    }
     return headers;
   }
 
@@ -368,6 +373,10 @@ class AuthService {
   }
 
   static Future<int?> getCurrentCodusu() async {
+    final EmpresaModel? empresa = await getCurrentEmpresa();
+    if (empresa?.codusu != null && empresa!.codusu! > 0) {
+      return empresa.codusu;
+    }
     final UserModel? user = await getCurrentUser();
     if (user == null) {
       return null;
@@ -375,19 +384,48 @@ class AuthService {
     if (user.codusu != null && user.codusu! > 0) {
       return user.codusu;
     }
-    final EmpresaModel? empresa = await getCurrentEmpresa();
-    if (empresa?.codusu != null && empresa!.codusu! > 0) {
-      return empresa.codusu;
-    }
     final String? empresaId = await getEmpresaId();
     final String? refEmpresaId = UserModel.extractEmpresaIdFromRef(user.id);
     final int? refCodusu = UserModel.extractCodusuFromRef(user.id);
     if (empresaId != null &&
         refEmpresaId == empresaId &&
-        refCodusu != null) {
+        refCodusu != null &&
+        refCodusu > 0) {
       return refCodusu;
     }
+    final String? token = await getToken();
+    if (token != null && token.isNotEmpty && empresaId != null) {
+      final Map<String, dynamic>? payload = JwtHelper.decodePayload(token);
+      final String? sub = payload?['sub']?.toString();
+      if (sub != null && sub.isNotEmpty) {
+        final String? jwtEmpresaId = UserModel.extractEmpresaIdFromRef(sub);
+        final int? jwtCodusu = UserModel.extractCodusuFromRef(sub);
+        if (jwtEmpresaId == empresaId && jwtCodusu != null && jwtCodusu > 0) {
+          return jwtCodusu;
+        }
+      }
+    }
     return null;
+  }
+
+  static int? _parseCodven(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+    final int? parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return parsed;
+  }
+
+  static Future<int?> getCurrentCodven() async {
+    final EmpresaModel? empresa = await getCurrentEmpresa();
+    if (empresa?.codven != null && empresa!.codven! > 0) {
+      return empresa.codven;
+    }
+    final UserModel? user = await getCurrentUser();
+    return _parseCodven(user?.codven);
   }
 
   static Future<String?> getUserName() async {
@@ -485,6 +523,7 @@ class AuthService {
         cnpj: empresa.cnpj,
         logomarcaUrl: empresa.logomarcaUrl,
         codusu: refCodusu,
+        codven: empresa.codven,
       ).toJson()),
     );
   }

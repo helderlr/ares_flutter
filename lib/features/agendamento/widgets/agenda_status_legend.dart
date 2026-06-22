@@ -48,7 +48,7 @@ class AgendaStatusLegend {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Agenda Cirurgia - Legenda'),
+          title: const Text('Legenda'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,

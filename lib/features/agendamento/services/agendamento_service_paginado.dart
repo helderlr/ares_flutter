@@ -1,14 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
-
-import '../../../core/config/api_config.dart';
-import '../../../core/services/http_request_helper.dart';
+import '../../../core/services/paginated_api_helper.dart';
 import '../../../core/services/unauthorized_exception.dart';
-import '../../login/services/auth_service.dart';
 import '../models/agendamento_model.dart';
+import '../models/agenda_list_filters.dart';
 
 class AgendamentoServicePaginado {
-  List<AgendaCirurgia>? _cachedAgendamentos;
 
   Future<AgendaCirurgiaPaginatedResponse> fetchAgendamentosPaginated({
     required int page,
@@ -16,31 +11,16 @@ class AgendamentoServicePaginado {
     String? sortBy,
     String? sortOrder,
     String? searchQuery,
+    AgendaListFilters? filters,
   }) async {
     try {
-      final List<AgendaCirurgia> allItems = await _fetchAllAgendamentos();
-      List<AgendaCirurgia> filtered = _applySearch(allItems, searchQuery);
-      filtered = _applySort(filtered, sortBy, sortOrder);
-      final int totalRecords = filtered.length;
-      final int totalPages =
-          totalRecords == 0 ? 0 : (totalRecords / pageSize).ceil();
-      final int safePage = page < 1 ? 1 : page;
-      final int startIndex = (safePage - 1) * pageSize;
-      final List<AgendaCirurgia> pageItems = startIndex >= totalRecords
-          ? <AgendaCirurgia>[]
-          : filtered.skip(startIndex).take(pageSize).toList();
-      final AgendaCirurgiaPaginationInfo pagination =
-          AgendaCirurgiaPaginationInfo(
-        currentPage: safePage,
+      return _fetchAgendamentosServerPaginated(
+        page: page,
         pageSize: pageSize,
-        totalRecords: totalRecords,
-        totalPages: totalPages,
-        hasNextPage: safePage < totalPages,
-        hasPreviousPage: safePage > 1,
-      );
-      return AgendaCirurgiaPaginatedResponse(
-        agendamentos: pageItems,
-        pagination: pagination,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+        searchQuery: searchQuery,
+        filters: filters,
       );
     } on UnauthorizedException {
       rethrow;
@@ -49,68 +29,115 @@ class AgendamentoServicePaginado {
     }
   }
 
-  Future<List<AgendaCirurgia>> _fetchAllAgendamentos() async {
-    if (_cachedAgendamentos != null) {
-      return List<AgendaCirurgia>.from(_cachedAgendamentos!);
+  Future<AgendaCirurgiaPaginatedResponse> _fetchAgendamentosServerPaginated({
+    required int page,
+    required int pageSize,
+    String? sortBy,
+    String? sortOrder,
+    String? searchQuery,
+    AgendaListFilters? filters,
+  }) async {
+    final Map<String, String> extra = _buildAgendaFilterExtra(filters);
+    final AgendaDateFilterField dateField =
+        filters?.dateField ?? AgendaDateFilterField.dataCirurgia;
+    extra['dateField'] =
+        dateField == AgendaDateFilterField.dataMovto ? 'datlan' : 'datcir';
+    final String effectiveSort = sortOrder ?? 'desc';
+    extra['sortDir'] = effectiveSort.toLowerCase() == 'asc' ? 'asc' : 'desc';
+    if (filters?.hasUserDateRange == true) {
+      if (filters?.dateFrom != null) {
+        extra['dateFrom'] =
+            PaginatedApiHelper.formatIsoDate(filters!.dateFrom!);
+      }
+      if (filters?.dateTo != null) {
+        extra['dateTo'] = PaginatedApiHelper.formatIsoDate(filters!.dateTo!);
+      }
     }
-    final Map<String, String> paramsWithEmpresa =
-        await HttpRequestHelper.withEmpresaId(<String, String>{});
-    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/agenda-cirurgia')
-        .replace(queryParameters: paramsWithEmpresa);
-    final HttpClient httpClient = HttpRequestHelper.createClient();
-    httpClient.connectionTimeout = const Duration(seconds: 60);
-    try {
-      final HttpClientRequest request = await httpClient.getUrl(uri);
-      await HttpRequestHelper.applyJsonHeaders(request);
-      final HttpClientResponse httpResponse = await request.close();
-      final String responseBody =
-          await httpResponse.transform(utf8.decoder).join();
-      if (httpResponse.statusCode == 200) {
-        try {
-          final dynamic data = HttpRequestHelper.decodeResponse(responseBody);
-          final List<dynamic> rows = data is List
-              ? data
-              : (data is Map<String, dynamic> && data['data'] is List
-                  ? data['data'] as List<dynamic>
-                  : <dynamic>[]);
-          final List<AgendaCirurgia> agendamentos = rows
-              .map(
-                (dynamic item) =>
-                    AgendaCirurgia.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
-          _cachedAgendamentos = agendamentos;
-          return agendamentos;
-        } catch (error) {
-          throw Exception(_formatHttpError(httpResponse.statusCode, responseBody));
-        }
-      }
-      if (httpResponse.statusCode == 401) {
-        await AuthService.handleSessionExpired();
-        throw const UnauthorizedException();
-      }
-      throw Exception(
-        _formatHttpError(httpResponse.statusCode, responseBody),
-      );
-    } finally {
-      httpClient.close();
+    final PaginatedApiDecoded decoded = await PaginatedApiHelper.fetchPage(
+      menuPath: '/menu/agenda-cirurgia',
+      queryParams: PaginatedApiHelper.buildListQuery(
+        page: page,
+        pageSize: pageSize,
+        search: searchQuery?.trim().isNotEmpty == true
+            ? searchQuery!.trim()
+            : null,
+        extra: extra,
+      ),
+      connectionTimeout: const Duration(seconds: 60),
+    );
+    List<AgendaCirurgia> agendamentos = decoded.data
+        .map(
+          (dynamic item) =>
+              AgendaCirurgia.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+    if (sortBy != null && sortBy != 'date') {
+      agendamentos = _applySort(agendamentos, sortBy, sortOrder);
+    }
+    return AgendaCirurgiaPaginatedResponse(
+      agendamentos: agendamentos,
+      pagination: AgendaCirurgiaPaginationInfo.fromJson(decoded.pagination),
+    );
+  }
+
+  Map<String, String> _buildAgendaFilterExtra(AgendaListFilters? filters) {
+    final Map<String, String> extra = <String, String>{};
+    if (filters == null) {
+      return extra;
+    }
+    _appendQueryParam(extra, 'paciente', filters.pacienteQuery);
+    _appendQueryParam(extra, 'nummov', filters.nummovQuery);
+    _appendQueryParam(extra, 'medico', filters.medicoQuery);
+    _appendQueryParam(extra, 'convenio', filters.convenioQuery);
+    _appendQueryParam(extra, 'hospital', filters.hospitalQuery);
+    _appendQueryParam(extra, 'tipoCirurgia', filters.tipoCirurgiaQuery);
+    _appendQueryParam(extra, 'instrumentador', filters.instrumentadorQuery);
+    _appendQueryParam(extra, 'vendedor', filters.vendedorQuery);
+    extra['agendaCancelada'] = _triFilterToParam(filters.agendaCancelada);
+    extra['agendaComPedido'] = _triFilterToParam(filters.agendaComPedido);
+    return extra;
+  }
+
+  void _appendQueryParam(
+    Map<String, String> extra,
+    String key,
+    String? value,
+  ) {
+    if (value != null && value.trim().isNotEmpty) {
+      extra[key] = value.trim();
     }
   }
 
-  List<AgendaCirurgia> _applySearch(
-    List<AgendaCirurgia> items,
-    String? searchQuery,
-  ) {
-    if (searchQuery == null || searchQuery.trim().isEmpty) {
-      return items;
+  String _triFilterToParam(AgendaTriFilter tri) {
+    switch (tri) {
+      case AgendaTriFilter.sim:
+        return 'S';
+      case AgendaTriFilter.nao:
+        return 'N';
+      case AgendaTriFilter.todas:
+        return 'T';
     }
-    final String query = searchQuery.trim().toLowerCase();
-    return items
-        .where(
-          (AgendaCirurgia item) =>
-              item.pacienteName.toLowerCase().contains(query),
-        )
-        .toList();
+  }
+
+  int _compareHorcir(String? horaA, String? horaB) {
+    final String normalizedA = _normalizeHorcir(horaA);
+    final String normalizedB = _normalizeHorcir(horaB);
+    return normalizedA.compareTo(normalizedB);
+  }
+
+  String _normalizeHorcir(String? hora) {
+    if (hora == null || hora.trim().isEmpty) {
+      return '99:99:99';
+    }
+    final List<String> parts = hora.trim().split(':');
+    if (parts.length < 2) {
+      return hora.trim();
+    }
+    final String hour = parts[0].padLeft(2, '0');
+    final String minute = parts[1].padLeft(2, '0');
+    final String second =
+        parts.length >= 3 ? parts[2].padLeft(2, '0') : '00';
+    return '$hour:$minute:$second';
   }
 
   List<AgendaCirurgia> _applySort(
@@ -120,11 +147,6 @@ class AgendamentoServicePaginado {
   ) {
     final List<AgendaCirurgia> sorted = List<AgendaCirurgia>.from(items);
     final bool isDescending = (sortOrder ?? 'desc').toLowerCase() == 'desc';
-    int compareDates(AgendaCirurgia a, AgendaCirurgia b) {
-      final DateTime dateA = a.datcir ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final DateTime dateB = b.datcir ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return dateA.compareTo(dateB);
-    }
     switch (sortBy) {
       case 'patient':
         sorted.sort(
@@ -157,8 +179,11 @@ class AgendamentoServicePaginado {
         break;
       case 'date':
       default:
-        sorted.sort(compareDates);
-        break;
+        sorted.sort(
+          (AgendaCirurgia a, AgendaCirurgia b) =>
+              compareAgendas(a, b, dateDescending: isDescending),
+        );
+        return sorted;
     }
     if (isDescending) {
       return sorted.reversed.toList();
@@ -166,18 +191,38 @@ class AgendamentoServicePaginado {
     return sorted;
   }
 
-  String _formatHttpError(int statusCode, String responseBody) {
-    if (statusCode == 502 || responseBody.contains('502')) {
-      return 'Servidor da agenda indisponível (502). A consulta usa várias tabelas (paciente, médico, hospital...) e pode falhar quando o servidor está sobrecarregado. Tente novamente em alguns minutos.';
+  int compareAgendas(
+    AgendaCirurgia a,
+    AgendaCirurgia b, {
+    bool dateDescending = true,
+  }) {
+    final DateTime? dateA = a.datcir;
+    final DateTime? dateB = b.datcir;
+    if (dateA == null && dateB == null) {
+      return _compareHorcir(a.horcir, b.horcir);
     }
-    if (statusCode == 503) {
-      return 'Serviço indisponível no momento. Tente novamente mais tarde.';
+    if (dateA == null) {
+      return 1;
     }
-    if (statusCode >= 500) {
-      return 'Erro no servidor ($statusCode). Tente novamente mais tarde.';
+    if (dateB == null) {
+      return -1;
     }
-    return 'Erro na API ($statusCode)';
+    final int dateCompare = dateDescending
+        ? dateB.compareTo(dateA)
+        : dateA.compareTo(dateB);
+    if (dateCompare != 0) {
+      return dateCompare;
+    }
+    final int horaCompare = _compareHorcir(a.horcir, b.horcir);
+    if (horaCompare != 0) {
+      return horaCompare;
+    }
+    return dateDescending
+        ? b.nummov.compareTo(a.nummov)
+        : a.nummov.compareTo(b.nummov);
   }
+
+  void clearCache() {}
 
   String _formatError(Object error) {
     final String message = error.toString();
@@ -195,15 +240,12 @@ class AgendamentoServicePaginado {
     return message.replaceAll('Exception: ', '');
   }
 
-  void clearCache() {
-    _cachedAgendamentos = null;
-  }
-
   Future<AgendaCirurgiaPaginatedResponse> fetchNextPage(
     AgendaCirurgiaPaginationInfo currentPagination, {
     String? sortBy,
     String? sortOrder,
     String? searchQuery,
+    AgendaListFilters? filters,
   }) async {
     if (!currentPagination.hasNextPage) {
       throw Exception('Não há mais páginas para carregar');
@@ -214,6 +256,7 @@ class AgendamentoServicePaginado {
       sortBy: sortBy,
       sortOrder: sortOrder,
       searchQuery: searchQuery,
+      filters: filters,
     );
   }
 
@@ -222,6 +265,7 @@ class AgendamentoServicePaginado {
     String? sortBy,
     String? sortOrder,
     String? searchQuery,
+    AgendaListFilters? filters,
   }) async {
     if (!currentPagination.hasPreviousPage) {
       throw Exception('Não há página anterior');
@@ -232,6 +276,7 @@ class AgendamentoServicePaginado {
       sortBy: sortBy,
       sortOrder: sortOrder,
       searchQuery: searchQuery,
+      filters: filters,
     );
   }
 
@@ -241,6 +286,7 @@ class AgendamentoServicePaginado {
     String? sortBy,
     String? sortOrder,
     String? searchQuery,
+    AgendaListFilters? filters,
   }) async {
     return fetchAgendamentosPaginated(
       page: page,
@@ -248,6 +294,7 @@ class AgendamentoServicePaginado {
       sortBy: sortBy,
       sortOrder: sortOrder,
       searchQuery: searchQuery,
+      filters: filters,
     );
   }
 }

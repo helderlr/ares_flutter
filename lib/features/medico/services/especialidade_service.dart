@@ -27,7 +27,7 @@ class EspecialidadeService {
       await HttpRequestHelper.throwIfUnauthorized(httpResponse.statusCode);
       if (httpResponse.statusCode != 200) {
         throw Exception(
-          'Erro ao carregar especialidades: ${httpResponse.statusCode}',
+          _formatFetchError(httpResponse.statusCode, responseBody),
         );
       }
       final List<dynamic> rows = _extractRows(
@@ -98,5 +98,27 @@ class EspecialidadeService {
 
   static void clearCache() {
     _cacheByEmpresa.clear();
+  }
+
+  String _formatFetchError(int statusCode, String responseBody) {
+    String apiError = '';
+    try {
+      final dynamic decoded = json.decode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        apiError = decoded['error']?.toString().trim() ?? '';
+      }
+    } catch (_) {}
+    if (statusCode == 503) {
+      return 'Especialidades indisponíveis no servidor. '
+          'Você pode salvar o médico sem especialidade.';
+    }
+    if (statusCode == 502) {
+      return 'Servidor indisponível ao carregar especialidades. '
+          'Tente novamente em instantes.';
+    }
+    if (apiError.isNotEmpty) {
+      return apiError;
+    }
+    return 'Erro ao carregar especialidades ($statusCode).';
   }
 }

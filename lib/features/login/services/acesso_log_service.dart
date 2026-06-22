@@ -23,44 +23,37 @@ class AcessoLogService {
 
   static Future<void> _registerAccess({required String tipmov}) async {
     try {
+      await AuthService.repairSessionCodusuIfNeeded();
       final String empresaId = await AuthService.requireEmpresaId();
       final int? codusu = await AuthService.getCurrentCodusu();
       if (codusu == null || codusu <= 0) {
-        if (kDebugMode) {
-          debugPrint(
-            'AcessoLogService: codusu ausente — $tipmov não registrado.',
-          );
-        }
+        debugPrint(
+          'AcessoLogService: codusu ausente — $tipmov não registrado.',
+        );
         return;
       }
+      await AuthService.requireToken();
       final MobileDeviceSnapshot device =
           await MobileDeviceContext.collect();
-      final Map<String, dynamic> basePayload = <String, dynamic>{
+      final Map<String, dynamic> payload = <String, dynamic>{
         'empresaId': empresaId,
         'codusu': codusu,
-        ...device.toApiJson(),
-      };
-      await _postDispositivoUsuario(basePayload);
-      await _postLogAcesso(<String, dynamic>{
-        ...basePayload,
         'tipmov': tipmov,
         'sucesso': 'S',
-      });
-      if (kDebugMode) {
-        debugPrint('AcessoLogService: $tipmov registrado (codusu=$codusu).');
-      }
+        ...device.toApiJson(),
+      };
+      await _postMobileAcesso(payload);
+      debugPrint('AcessoLogService: $tipmov registrado (codusu=$codusu).');
     } catch (error, stackTrace) {
+      debugPrint('AcessoLogService: falha em $tipmov — $error');
       if (kDebugMode) {
-        debugPrint('AcessoLogService: falha em $tipmov — $error');
         debugPrint('$stackTrace');
       }
     }
   }
 
-  static Future<void> _postDispositivoUsuario(
-    Map<String, dynamic> payload,
-  ) async {
-    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/dispositivo-usuario');
+  static Future<void> _postMobileAcesso(Map<String, dynamic> payload) async {
+    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/auth/mobile-acesso');
     final HttpClient httpClient = HttpRequestHelper.createClient();
     try {
       final HttpClientRequest request = await httpClient.postUrl(uri);
@@ -71,37 +64,18 @@ class AcessoLogService {
           await httpResponse.transform(utf8.decoder).join();
       if (httpResponse.statusCode == 401 || httpResponse.statusCode == 403) {
         throw HttpException(
-          'dispositivo-usuario ${httpResponse.statusCode}: $responseBody',
+          'mobile-acesso ${httpResponse.statusCode}: $responseBody',
         );
       }
       if (httpResponse.statusCode != 200) {
         throw HttpException(
-          'dispositivo-usuario ${httpResponse.statusCode}: $responseBody',
+          'mobile-acesso ${httpResponse.statusCode}: $responseBody',
         );
       }
-    } finally {
-      httpClient.close();
-    }
-  }
-
-  static Future<void> _postLogAcesso(Map<String, dynamic> payload) async {
-    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/log-acesso');
-    final HttpClient httpClient = HttpRequestHelper.createClient();
-    try {
-      final HttpClientRequest request = await httpClient.postUrl(uri);
-      await HttpRequestHelper.applyJsonHeaders(request);
-      request.write(jsonEncode(payload));
-      final HttpClientResponse httpResponse = await request.close();
-      final String responseBody =
-          await httpResponse.transform(utf8.decoder).join();
-      if (httpResponse.statusCode == 401 || httpResponse.statusCode == 403) {
+      final dynamic decoded = json.decode(responseBody);
+      if (decoded is Map<String, dynamic> && decoded['ok'] == false) {
         throw HttpException(
-          'log-acesso ${httpResponse.statusCode}: $responseBody',
-        );
-      }
-      if (httpResponse.statusCode != 200) {
-        throw HttpException(
-          'log-acesso ${httpResponse.statusCode}: $responseBody',
+          decoded['error']?.toString() ?? 'Erro ao registrar acesso mobile',
         );
       }
     } finally {

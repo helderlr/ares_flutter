@@ -337,14 +337,14 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     if (title == 'Sair') {
-      _executeLogout();
+      _executeExit();
       return;
     }
     _showModuleInDevelopment(title);
   }
 
-  Future<void> _executeLogout() async {
-    await widget.onLogout();
+  Future<void> _executeExit() async {
+    await widget.onExitApp();
   }
 
   @override

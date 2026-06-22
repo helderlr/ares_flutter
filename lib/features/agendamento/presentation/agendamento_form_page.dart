@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_context.dart';
+import '../../../core/widgets/protected_ui.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../login/services/auth_service.dart';
+import '../../vendedor/services/vendedor_service.dart';
 import '../models/agendamento_model.dart';
 import '../services/agendamento_service.dart';
 import '../../paciente/services/paciente_service.dart';
@@ -10,8 +14,13 @@ import '../../tipo_cirurgia/services/tipo_cirurgia_service_paginado.dart';
 
 class AgendamentoFormPage extends StatefulWidget {
   final AgendaCirurgia? agendamento;
+  final AgendaCirurgia? copyFrom;
 
-  const AgendamentoFormPage({Key? key, this.agendamento}) : super(key: key);
+  const AgendamentoFormPage({
+    Key? key,
+    this.agendamento,
+    this.copyFrom,
+  }) : super(key: key);
 
   @override
   State<AgendamentoFormPage> createState() => _AgendamentoFormPageState();
@@ -26,6 +35,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   final ConvenioServicePaginado _convenioService = ConvenioServicePaginado();
   final TipoCirurgiaServicePaginado _cirurgiaService =
       TipoCirurgiaServicePaginado();
+  final VendedorService _vendedorService = VendedorService();
 
   // Controllers para os campos do formulário
   final TextEditingController _pacienteController = TextEditingController();
@@ -46,9 +56,14 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   int? _codmed;
   int? _codcli;
   int? _codconv;
+  int? _codcir;
+  int? _codven;
+  String? _vendedorNome;
 
   bool _isLoading = false;
   bool _isEditing = false;
+  bool _isCopy = false;
+  int? _numageOrigem;
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
@@ -67,30 +82,53 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   @override
   void initState() {
     super.initState();
-    _isEditing = widget.agendamento != null;
+    AppContext.beginProtectedUi();
+    _isCopy = widget.copyFrom != null;
+    _isEditing = widget.agendamento != null && !_isCopy;
 
-    if (_isEditing) {
-      _loadAgendamentoData();
+    if (_isCopy) {
+      _loadAgendamentoData(widget.copyFrom!);
+      _numageOrigem = widget.copyFrom!.nummov;
+      _selectedAgendaCancelada = 'N';
+    } else if (_isEditing) {
+      _loadAgendamentoData(widget.agendamento!);
     } else {
-      // Para novos agendamentos, definir alguns valores padrão
       _selectedDate = DateTime.now().add(const Duration(days: 1));
       _selectedTime = const TimeOfDay(hour: 8, minute: 0);
       _updateDateTimeControllers();
+      _loadDefaultVendedor();
     }
   }
 
-  void _loadAgendamentoData() {
-    final agendamento = widget.agendamento!;
+  Future<void> _loadDefaultVendedor() async {
+    final int? codven = await AuthService.getCurrentCodven();
+    if (codven == null || codven <= 0) {
+      return;
+    }
+    String? nome;
+    try {
+      final VendedorLookup? vendedor =
+          await _vendedorService.fetchByCodven(codven);
+      nome = vendedor?.nome;
+    } catch (_) {}
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _codven = codven;
+      _vendedorNome = nome;
+    });
+  }
 
-    // Carregar nomes selecionados em vez dos controllers (serão somente leitura)
-    _selectedPacienteName = agendamento.nompac ?? '';
-    _selectedMedicoName = agendamento.nommed ?? '';
-    _selectedHospitalName = agendamento.nomcli ?? '';
-    _selectedConvenioName = agendamento.nomconv ?? '';
-    _selectedCirurgiaName = agendamento.nomcir ?? '';
-
-    // Limpar controllers pois serão campos de busca
-    _pacienteController.clear();
+  void _loadAgendamentoData(AgendaCirurgia agendamento) {
+    _selectedPacienteName = _normalizeDisplayName(agendamento.nompac);
+    _selectedMedicoName = _normalizeDisplayName(agendamento.nommed);
+    _selectedHospitalName = _normalizeDisplayName(agendamento.nomcli);
+    _selectedConvenioName = _normalizeDisplayName(agendamento.nomconv);
+    _selectedCirurgiaName = _normalizeDisplayName(
+      agendamento.nomcirTipo ?? agendamento.nomcir,
+    );
+    _pacienteController.text = _selectedPacienteName ?? '';
     _medicoController.clear();
     _hospitalController.clear();
     _convenioController.clear();
@@ -98,8 +136,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
 
     _ladoController.text = agendamento.lado ?? '';
 
-    // Carregar novos campos
-    _nomeCirurgiaController.text = agendamento.nomcir ?? '';
+    _nomeCirurgiaController.text = _normalizeDisplayName(agendamento.nomcir) ?? '';
     _solicitanteController.text = agendamento.solicitou ?? '';
     _materialCirurgiaController.text = agendamento.matcir ?? '';
     _selectedPrimariaRevisao = agendamento.primrev;
@@ -110,20 +147,21 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     _codmed = agendamento.codmed;
     _codcli = agendamento.codcli;
     _codconv = agendamento.codconv;
+    _codcir = agendamento.codcir;
+    _codven = agendamento.codven;
+    _vendedorNome = agendamento.nomven;
 
     _selectedDate = agendamento.datcir;
     if (agendamento.horcir != null && agendamento.horcir!.isNotEmpty) {
       try {
-        final parts = agendamento.horcir!.split(':');
+        final List<String> parts = agendamento.horcir!.split(':');
         if (parts.length >= 2) {
           _selectedTime = TimeOfDay(
             hour: int.parse(parts[0]),
             minute: int.parse(parts[1]),
           );
         }
-      } catch (e) {
-        print('Erro ao parsear hora: ${agendamento.horcir}');
-      }
+      } catch (_) {}
     }
     _updateDateTimeControllers();
   }
@@ -141,6 +179,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
 
   @override
   void dispose() {
+    AppContext.endProtectedUi();
     _pacienteController.dispose();
     _medicoController.dispose();
     _hospitalController.dispose();
@@ -160,7 +199,13 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar Agenda' : 'Nova Agenda'),
+        title: Text(
+          _isEditing
+              ? 'Editar Agenda'
+              : _isCopy
+                  ? 'Copiar Agenda'
+                  : 'Nova Agenda',
+        ),
         backgroundColor: AppColors.lightBlue,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -190,12 +235,20 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                     children: [
                       if (_isEditing)
                         _buildReadOnlyField(
-                            'No Agenda', widget.agendamento!.nummov.toString()),
+                          'No Agenda',
+                          widget.agendamento!.nummov.toString(),
+                        ),
+                      if (_isCopy)
+                        _buildReadOnlyField(
+                          'Agenda origem',
+                          widget.copyFrom!.nummov.toString(),
+                        ),
                       _buildPacienteSearchField(),
                       _buildMedicoSearchField(),
                       _buildHospitalSearchField(),
                       _buildConvenioSearchField(),
                       _buildCirurgiaSearchField(),
+                      _buildVendedorField(),
                       _buildNomeCirurgiaField(),
                       _buildDateField(),
                       _buildTimeField(),
@@ -310,86 +363,53 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     );
   }
 
+  String? _normalizeDisplayName(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed.replaceFirst(RegExp(r'^[,.\s]+'), '').trim();
+  }
+
   Widget _buildPacienteSearchField() {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Label
-          Text(
+          const Text(
             'Paciente *',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
               color: Colors.black87,
             ),
           ),
           const SizedBox(height: 8),
-
-          // Se está editando, mostrar nome atual + botão para trocar
-          if (_isEditing && _selectedPacienteName != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+          TextFormField(
+            controller: _pacienteController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              hintText: 'Digite ou busque o paciente',
+              border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedPacienteName!,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.search, color: Colors.blue[700]),
-                    onPressed: _showPacienteSearchDialog,
-                    tooltip: 'Buscar outro paciente',
-                  ),
-                ],
+              suffixIcon: IconButton(
+                icon: Icon(Icons.search, color: Colors.blue[700]),
+                onPressed: _showPacienteSearchDialog,
+                tooltip: 'Buscar paciente',
               ),
             ),
-          ] else ...[
-            // Se é novo agendamento, mostrar campo de busca
-            InkWell(
-              onTap: _showPacienteSearchDialog,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, color: Colors.grey[600]),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _selectedPacienteName ?? 'Toque para buscar paciente',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: _selectedPacienteName != null
-                              ? Colors.black87
-                              : Colors.grey[600],
-                          fontWeight: _selectedPacienteName != null
-                              ? FontWeight.w500
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-
+            onChanged: (String value) {
+              setState(() {
+                _selectedPacienteName = _normalizeDisplayName(value);
+                _codpac = null;
+              });
+            },
+          ),
           const SizedBox(height: 12),
           Divider(
             color: Colors.grey.shade300,
@@ -423,7 +443,9 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
           const SizedBox(height: 8),
 
           // Se está editando, mostrar nome atual + botão para trocar
-          if (_isEditing && selectedValue != null) ...[
+          if (_isEditing &&
+              selectedValue != null &&
+              selectedValue.trim().isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -524,11 +546,20 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
 
   Widget _buildCirurgiaSearchField() {
     return _buildSearchField(
-      label: 'Cirurgia *',
+      label: 'Tipo Cirurgia *',
       selectedValue: _selectedCirurgiaName,
       onTap: _showCirurgiaSearchDialog,
-      placeholder: 'Toque para buscar cirurgia',
+      placeholder: 'Toque para buscar tipo de cirurgia',
     );
+  }
+
+  Widget _buildVendedorField() {
+    final String value = _codven != null && _codven! > 0
+        ? (_vendedorNome != null && _vendedorNome!.isNotEmpty
+            ? '$_codven - $_vendedorNome'
+            : 'Código $_codven')
+        : 'Não informado';
+    return _buildReadOnlyField('Vendedor', value);
   }
 
   Widget _buildReadOnlyField(String label, String value) {
@@ -642,8 +673,8 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
         return 'Digite o nome do hospital ou clínica';
       case 'Convênio *':
         return 'Digite o nome do convênio';
-      case 'Cirurgia *':
-        return 'Digite o nome da cirurgia';
+      case 'Tipo Cirurgia *':
+        return 'Digite o nome do tipo de cirurgia';
       case 'Autorização':
         return 'Número da autorização';
       case 'Observações':
@@ -1007,7 +1038,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   }
 
   Future<void> _selectDate() async {
-    final date = await showDatePicker(
+    final date = await showProtectedDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime.now(),
@@ -1023,7 +1054,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   }
 
   Future<void> _selectTime() async {
-    final time = await showTimePicker(
+    final time = await showProtectedTimePicker(
       context: context,
       initialTime: _selectedTime ?? const TimeOfDay(hour: 8, minute: 0),
     );
@@ -1041,7 +1072,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     List<Map<String, dynamic>> searchResults = [];
     bool isSearching = false;
 
-    showDialog(
+    showProtectedDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
@@ -1134,10 +1165,12 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                                     final paciente = searchResults[index];
                                     final codpac = paciente['codpac'] ??
                                         paciente['CODPAC'];
-                                    final nompac = paciente['nompac'] ??
-                                        paciente['NOMPAC'] ??
+                                    final String nompac = _normalizeDisplayName(
+                                          paciente['nompac'] ??
+                                              paciente['NOMPAC'] ??
+                                              '',
+                                        ) ??
                                         '';
-
                                     return ListTile(
                                       leading: CircleAvatar(
                                         child: Icon(Icons.person),
@@ -1147,8 +1180,13 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                                       subtitle: Text('Código: $codpac'),
                                       onTap: () {
                                         setState(() {
-                                          _codpac = codpac;
+                                          _codpac = codpac is int
+                                              ? codpac
+                                              : int.tryParse(
+                                                  codpac.toString(),
+                                                );
                                           _selectedPacienteName = nompac;
+                                          _pacienteController.text = nompac;
                                         });
                                         Navigator.of(context).pop();
                                       },
@@ -1179,7 +1217,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
       searchFunction: (query) async {
         final response = await _medicoService.fetchMedicosPaginated(
           page: 1,
-          pageSize: 20,
+          pageSize: 50,
           searchQuery: query,
         );
         return response.medicos
@@ -1231,7 +1269,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
       searchFunction: (query) async {
         final response = await _convenioService.fetchConveniosPaginated(
           page: 1,
-          pageSize: 20,
+          pageSize: 50,
           searchQuery: query,
         );
         return response.convenios
@@ -1252,12 +1290,12 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
 
   Future<void> _showCirurgiaSearchDialog() async {
     await _showGenericSearchDialog<Map<String, dynamic>>(
-      title: 'Buscar Cirurgia',
-      placeholder: 'Digite o nome da cirurgia',
+      title: 'Buscar Tipo Cirurgia',
+      placeholder: 'Digite o nome do tipo de cirurgia',
       searchFunction: (query) async {
         final response = await _cirurgiaService.fetchTiposCirurgiaPaginated(
           page: 1,
-          pageSize: 20,
+          pageSize: 50,
           searchQuery: query,
         );
         return response.tiposCirurgia
@@ -1269,8 +1307,12 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
       },
       onSelected: (item) {
         setState(() {
-          // Para cirurgia, vamos usar o nome como código também por enquanto
-          _selectedCirurgiaName = item['name'];
+          _codcir = item['code'] as int?;
+          _selectedCirurgiaName = item['name'] as String?;
+          if (_nomeCirurgiaController.text.trim().isEmpty &&
+              _selectedCirurgiaName != null) {
+            _nomeCirurgiaController.text = _selectedCirurgiaName!;
+          }
         });
       },
     );
@@ -1286,7 +1328,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     List<T> searchResults = [];
     bool isSearching = false;
 
-    showDialog(
+    showProtectedDialog(
       context: context,
       builder: (BuildContext context) {
         return StatefulBuilder(
@@ -1419,7 +1461,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
         return Icons.business;
       case 'Buscar Convênio':
         return Icons.credit_card;
-      case 'Buscar Cirurgia':
+      case 'Buscar Tipo Cirurgia':
         return Icons.healing;
       default:
         return Icons.search;
@@ -1432,14 +1474,22 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
     }
 
     // Validar se todas as entidades obrigatórias foram selecionadas
-    if (_codpac == null || _selectedPacienteName == null) {
+    _selectedPacienteName =
+        _normalizeDisplayName(_pacienteController.text.trim());
+    if (_codpac == null ||
+        _selectedPacienteName == null ||
+        _selectedPacienteName!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione um paciente')),
+        const SnackBar(
+          content: Text('Informe o paciente e selecione na busca'),
+        ),
       );
       return;
     }
 
-    if (_codmed == null || _selectedMedicoName == null) {
+    if (_codmed == null ||
+        _selectedMedicoName == null ||
+        _selectedMedicoName!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecione um médico')),
       );
@@ -1460,9 +1510,9 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
       return;
     }
 
-    if (_selectedCirurgiaName == null) {
+    if (_selectedCirurgiaName == null || _selectedCirurgiaName!.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecione uma cirurgia')),
+        const SnackBar(content: Text('Selecione um tipo de cirurgia')),
       );
       return;
     }
@@ -1516,11 +1566,20 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
           solicitou: _solicitanteController.text.trim(),
           cirurgiaUrgencia: _selectedCirurgiaUrgencia,
           matcir: _materialCirurgiaController.text.trim(),
+          codven: _codven,
+          codcir: _codcir,
+          numageOrigem: _numageOrigem,
         );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Agendamento criado com sucesso!')),
+            SnackBar(
+              content: Text(
+                _isCopy
+                    ? 'Agenda copiada com sucesso!'
+                    : 'Agendamento criado com sucesso!',
+              ),
+            ),
           );
         }
       }

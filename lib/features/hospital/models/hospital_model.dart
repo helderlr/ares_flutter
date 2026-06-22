@@ -46,6 +46,8 @@ class Hospital {
   bool get isHospital =>
       (clihos ?? 'S').trim().toUpperCase() == 'S';
 
+  String get hospitalSimNaoLabel => isHospital ? 'Sim' : 'Não';
+
   bool canEditByUser(int? loggedCodusu) {
     if (loggedCodusu == null || codUsu == null) {
       return false;

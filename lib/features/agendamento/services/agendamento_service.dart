@@ -2,16 +2,52 @@ import 'dart:convert';
 import 'dart:io';
 import '../../../core/config/api_config.dart';
 import '../../../core/services/http_request_helper.dart';
-import '../../../core/services/unauthorized_exception.dart';
-import '../../login/services/auth_service.dart';
 import '../../login/services/auth_service.dart';
 
 class AgendamentoService {
   Future<void> cancelarAgendamento(
-      int id, String motivo, DateTime dataCancelamento) async {
-    await Future.delayed(const Duration(seconds: 2));
+    int nummov,
+    String motivo,
+    DateTime dataCancelamento,
+  ) async {
+    final String empresaId = await AuthService.requireEmpresaId();
+    final String horaCancelamento =
+        '${dataCancelamento.hour.toString().padLeft(2, '0')}:'
+        '${dataCancelamento.minute.toString().padLeft(2, '0')}:'
+        '${dataCancelamento.second.toString().padLeft(2, '0')}';
+    final Uri uri =
+        Uri.parse('${ApiConfig.apiUrl}/menu/agenda-cirurgia/$nummov').replace(
+      queryParameters: <String, String>{'empresaId': empresaId},
+    );
+    final Map<String, dynamic> requestBody = <String, dynamic>{
+      'empresaId': empresaId,
+      'agenda_cancelada': 'S',
+      'data_cancelamento': _formatDateToApi(dataCancelamento),
+      'hora_cancelamento': horaCancelamento,
+      'motivo_cancelamento': motivo.trim(),
+    };
+    final HttpClient httpClient = HttpRequestHelper.createClient();
+    try {
+      final HttpClientRequest request = await httpClient.patchUrl(uri);
+      await HttpRequestHelper.applyJsonHeaders(request);
+      request.write(jsonEncode(requestBody));
+      final HttpClientResponse httpResponse = await request.close();
+      final String responseBody =
+          await httpResponse.transform(utf8.decoder).join();
+      await HttpRequestHelper.throwIfUnauthorized(httpResponse.statusCode);
+      if (httpResponse.statusCode == 200) {
+        return;
+      }
+      if (httpResponse.statusCode == 404) {
+        throw Exception('Agendamento não encontrado.');
+      }
+      throw Exception(
+        'Erro ao cancelar agendamento: ${httpResponse.statusCode} - $responseBody',
+      );
+    } finally {
+      httpClient.close();
+    }
   }
-
 
   Future<Map<String, dynamic>> createAgendamento({
     required int codpac,
@@ -34,18 +70,21 @@ class AgendamentoService {
     String? solicitou,
     String? cirurgiaUrgencia,
     String? matcir,
+    int? codven,
+    int? codcir,
+    int? numageOrigem,
   }) async {
-    final url = '${ApiConfig.apiUrl}/menu/agenda-cirurgia/add_agenda_cirurgia';
-
-    final requestBody = {
+    final String empresaId = await AuthService.requireEmpresaId();
+    final int? codusu = await AuthService.getCurrentCodusu();
+    final Uri uri = Uri.parse('${ApiConfig.apiUrl}/menu/agenda-cirurgia').replace(
+      queryParameters: <String, String>{'empresaId': empresaId},
+    );
+    final Map<String, dynamic> requestBody = <String, dynamic>{
+      'empresaId': empresaId,
       'codpac': codpac,
-      'nompac': nompac.toUpperCase(),
       'codcli': codcli,
-      'nomcli': nomcli.toUpperCase(),
       'codmed': codmed,
-      'nommed': nommed.toUpperCase(),
       'codconv': codconv,
-      'nomconv': nomconv.toUpperCase(),
       'nomcir': nomcir.toUpperCase(),
       'datcir': _formatDateToApi(datcir),
       'horcir': horcir,
@@ -53,42 +92,46 @@ class AgendamentoService {
       if (obsage != null && obsage.isNotEmpty) 'obsage': obsage,
       if (numaut != null && numaut.isNotEmpty) 'numaut': numaut,
       if (lado != null && lado.isNotEmpty) 'lado': lado,
-      if (primrev != null && primrev.isNotEmpty) 'primrev': primrev,
+      if (primrev != null && primrev.isNotEmpty) 'primaria_revisao': primrev,
       if (agendaCancelada != null && agendaCancelada.isNotEmpty)
         'agenda_cancelada': agendaCancelada,
       if (solicitou != null && solicitou.isNotEmpty) 'solicitou': solicitou,
-      if (cirurgiaUrgencia != null && cirurgiaUrgencia.isNotEmpty)
-        'cirurgia_urgencia': cirurgiaUrgencia,
       if (matcir != null && matcir.isNotEmpty) 'matcir': matcir,
+      if (codven != null && codven > 0) 'codven': codven,
+      if (codcir != null && codcir > 0) 'codcir': codcir,
+      if (codusu != null && codusu > 0) 'codusu': codusu,
+      if (numageOrigem != null && numageOrigem > 0) 'numage_origem': numageOrigem,
       'datlan': _formatDateToApi(DateTime.now()),
     };
-
     final HttpClient httpClient = HttpRequestHelper.createClient();
-
     try {
-      final request = await httpClient.postUrl(Uri.parse(url));
+      final HttpClientRequest request = await httpClient.postUrl(uri);
       await HttpRequestHelper.applyJsonHeaders(request);
       request.write(jsonEncode(requestBody));
-
-      final httpResponse = await request.close();
-      final responseBody = await httpResponse.transform(utf8.decoder).join();
-
-      if (httpResponse.statusCode == 201) {
-        print('✅ Agendamento criado com sucesso na API!');
+      final HttpClientResponse httpResponse = await request.close();
+      final String responseBody =
+          await httpResponse.transform(utf8.decoder).join();
+      await HttpRequestHelper.throwIfUnauthorized(httpResponse.statusCode);
+      if (httpResponse.statusCode == 200 || httpResponse.statusCode == 201) {
         try {
-          final data = json.decode(responseBody);
-          return data;
-        } catch (e) {
-          return {'success': true, 'message': 'Agendamento criado com sucesso'};
+          final dynamic data = json.decode(responseBody);
+          if (data is Map<String, dynamic> && data['data'] is Map<String, dynamic>) {
+            return data['data'] as Map<String, dynamic>;
+          }
+          if (data is Map<String, dynamic>) {
+            return data;
+          }
+          return <String, dynamic>{'success': true};
+        } catch (_) {
+          return <String, dynamic>{'success': true};
         }
-      } else if (httpResponse.statusCode == 400) {
-        throw Exception('Dados inválidos: $responseBody');
-      } else if (httpResponse.statusCode == 500) {
-        throw Exception('Erro interno do servidor: $responseBody');
-      } else {
-        throw Exception(
-            'Erro ao criar agendamento: ${httpResponse.statusCode} - $responseBody');
       }
+      if (httpResponse.statusCode == 400) {
+        throw Exception('Dados inválidos: $responseBody');
+      }
+      throw Exception(
+        'Erro ao criar agendamento: ${httpResponse.statusCode} - $responseBody',
+      );
     } finally {
       httpClient.close();
     }
@@ -115,8 +158,13 @@ class AgendamentoService {
     print('   Data cirurgia: $datcir');
     print('   Hora cirurgia: $horcir');
 
-    final requestBody = <String, dynamic>{
-      'nummov': nummov,
+    final String empresaId = await AuthService.requireEmpresaId();
+    final Uri uri =
+        Uri.parse('${ApiConfig.apiUrl}/menu/agenda-cirurgia/$nummov').replace(
+      queryParameters: <String, String>{'empresaId': empresaId},
+    );
+    final Map<String, dynamic> requestBody = <String, dynamic>{
+      'empresaId': empresaId,
       'nomcir': nomcir.toUpperCase(),
       'datcir': _formatDateToApi(datcir),
       'horcir': horcir,
@@ -136,7 +184,7 @@ class AgendamentoService {
       requestBody['lado'] = lado;
     }
     if (primrev != null && primrev.isNotEmpty) {
-      requestBody['primrev'] = primrev;
+      requestBody['primaria_revisao'] = primrev;
     }
     if (agendaCancelada != null && agendaCancelada.isNotEmpty) {
       requestBody['agenda_cancelada'] = agendaCancelada;
@@ -153,38 +201,27 @@ class AgendamentoService {
 
     print('   Request body: $requestBody');
 
-    final url =
-        '${ApiConfig.apiUrl}/menu/agenda-cirurgia/$nummov';
-
     final HttpClient httpClient = HttpRequestHelper.createClient();
-
     try {
-      final request = await httpClient.putUrl(Uri.parse(url));
+      final HttpClientRequest request = await httpClient.patchUrl(uri);
       await HttpRequestHelper.applyJsonHeaders(request);
-
-      print('   Headers configurados');
-      print('   Enviando requisição...');
-
       request.write(jsonEncode(requestBody));
-
-      final httpResponse = await request.close();
-      final responseBody = await httpResponse.transform(utf8.decoder).join();
-
-      print('   Response body: $responseBody');
-      print('   Status code: ${httpResponse.statusCode}');
-
-      if (httpResponse.statusCode == 204) {
-        print('✅ Agendamento atualizado com sucesso!');
-      } else if (httpResponse.statusCode == 404) {
-        throw Exception('Agendamento não encontrado.');
-      } else if (httpResponse.statusCode == 400) {
-        throw Exception('Dados inválidos: $responseBody');
-      } else if (httpResponse.statusCode == 401) {
-        throw Exception('Token inválido ou expirado. Faça login novamente.');
-      } else {
-        throw Exception(
-            'Erro ao atualizar agendamento: ${httpResponse.statusCode} - $responseBody');
+      final HttpClientResponse httpResponse = await request.close();
+      final String responseBody =
+          await httpResponse.transform(utf8.decoder).join();
+      await HttpRequestHelper.throwIfUnauthorized(httpResponse.statusCode);
+      if (httpResponse.statusCode == 200) {
+        return;
       }
+      if (httpResponse.statusCode == 404) {
+        throw Exception('Agendamento não encontrado.');
+      }
+      if (httpResponse.statusCode == 400) {
+        throw Exception('Dados inválidos: $responseBody');
+      }
+      throw Exception(
+        'Erro ao atualizar agendamento: ${httpResponse.statusCode} - $responseBody',
+      );
     } finally {
       httpClient.close();
     }

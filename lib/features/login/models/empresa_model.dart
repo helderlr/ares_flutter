@@ -6,6 +6,7 @@ class EmpresaModel {
   final String? cnpj;
   final String? logomarcaUrl;
   final int? codusu;
+  final int? codven;
 
   const EmpresaModel({
     required this.id,
@@ -13,6 +14,7 @@ class EmpresaModel {
     this.cnpj,
     this.logomarcaUrl,
     this.codusu,
+    this.codven,
   });
 
   String get formattedCnpj => CnpjFormatter.format(cnpj);
@@ -38,6 +40,9 @@ class EmpresaModel {
       codusu: json['codusu'] is int
           ? json['codusu'] as int
           : int.tryParse(json['codusu']?.toString() ?? ''),
+      codven: json['codven'] is int
+          ? json['codven'] as int
+          : int.tryParse(json['codven']?.toString() ?? ''),
     );
   }
 
@@ -48,6 +53,7 @@ class EmpresaModel {
       if (cnpj != null) 'cnpj': cnpj,
       if (logomarcaUrl != null) 'logomarcaUrl': logomarcaUrl,
       if (codusu != null) 'codusu': codusu,
+      if (codven != null) 'codven': codven,
     };
   }
 

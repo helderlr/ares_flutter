@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../../../core/config/api_config.dart';
 import '../../../core/services/http_request_helper.dart';
+import '../../../core/services/paginated_api_helper.dart';
 import '../../../core/services/unauthorized_exception.dart';
 import '../../login/services/auth_service.dart';
 
@@ -151,7 +152,6 @@ class PacienteService {
         errorMessage += ' (Enviado: $requestBody)';
         throw Exception(errorMessage);
       } else if (httpResponse.statusCode == 401) {
-        await AuthService.handleSessionExpired();
         throw const UnauthorizedException();
       } else if (httpResponse.statusCode == 404) {
         print('❌ Erro 404 - Paciente não encontrado');
@@ -253,37 +253,28 @@ class PacienteService {
 
   /// Busca pacientes por nome na API
   Future<List<Map<String, dynamic>>> searchPacientes(String nome) async {
-
-    final url = '${ApiConfig.apiUrl}/menu/paciente/busca_paciente/$nome';
-
-    final HttpClient httpClient = HttpRequestHelper.createClient();
-
+    final String query = nome.trim();
+    if (query.length < 2) {
+      return <Map<String, dynamic>>[];
+    }
     try {
-      final request = await httpClient.getUrl(Uri.parse(url));
-      await HttpRequestHelper.applyJsonHeaders(request);
-
-      final httpResponse = await request.close();
-      final responseBody = await httpResponse.transform(utf8.decoder).join();
-
-      if (httpResponse.statusCode == 200) {
-        try {
-          final data = json.decode(responseBody);
-          if (data is List) {
-            return data.cast<Map<String, dynamic>>();
-          } else {
-            throw Exception('Formato de resposta inesperado da API');
-          }
-        } catch (e) {
-          throw Exception('Resposta inválida da API: $e');
-        }
-      } else if (httpResponse.statusCode == 401) {
-        throw Exception('Token inválido ou expirado. Faça login novamente.');
-      } else {
-        throw Exception(
-            'Erro ao buscar pacientes: ${httpResponse.statusCode} - $responseBody');
-      }
-    } finally {
-      httpClient.close();
+      final PaginatedApiDecoded decoded = await PaginatedApiHelper.fetchPage(
+        menuPath: '/menu/paciente',
+        queryParams: PaginatedApiHelper.buildListQuery(
+          page: 1,
+          pageSize: 30,
+          sortBy: 'name',
+          sortOrder: 'asc',
+          search: query,
+        ),
+      );
+      return decoded.data
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e) {
+      throw Exception('Erro ao buscar pacientes: $e');
     }
   }
 

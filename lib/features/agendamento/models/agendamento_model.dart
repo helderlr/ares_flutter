@@ -37,7 +37,10 @@ class AgendaCirurgia {
   final String? lado;
   final String? horsai;
   final int? codusu;
+  final String? nomusu;
   final String? primrev; // Primária/Revisão: P=Primária, R=Revisão
+  final String? horlan;
+  final int? nrelcir;
   final String? agendaCancelada; // Agenda cancelada: S=Sim, N=Não
   final DateTime? datcirOriginal; // Data cirurgia original
   final String? cirurgiaUrgencia; // Cirurgia urgência: S=Sim, N=Não
@@ -47,6 +50,7 @@ class AgendaCirurgia {
   final String? horaCancelamento; // Hora do cancelamento
   final String? motivoCancelamento; // Motivo do cancelamento
   final String? numeroPedido; // Número do pedido
+  final int? numpedv; // Número pedido venda
 
   const AgendaCirurgia({
     required this.nummov,
@@ -79,6 +83,9 @@ class AgendaCirurgia {
     this.lado,
     this.horsai,
     this.codusu,
+    this.nomusu,
+    this.horlan,
+    this.nrelcir,
     this.primrev,
     this.agendaCancelada,
     this.datcirOriginal,
@@ -89,6 +96,7 @@ class AgendaCirurgia {
     this.horaCancelamento,
     this.motivoCancelamento,
     this.numeroPedido,
+    this.numpedv,
   });
 
   int get id => nummov;
@@ -128,6 +136,12 @@ class AgendaCirurgia {
   String get motivoCancelamentoTexto =>
       motivoCancelamento ?? 'Motivo não informado';
   String get numeroPedidoTexto => numeroPedido ?? 'Número não informado';
+  bool get hasPedido =>
+      (numpedv != null && numpedv! > 0) ||
+      (numeroPedido != null &&
+          numeroPedido!.trim().isNotEmpty &&
+          int.tryParse(numeroPedido!.trim()) != null &&
+          int.parse(numeroPedido!.trim()) > 0);
 
   bool canEditByUser(int? loggedCodusu) {
     if (loggedCodusu == null || codusu == null) {
@@ -141,6 +155,30 @@ class AgendaCirurgia {
   bool get isRemarcada => datcirOriginal != null;
 
   String get situacaoCode => (situac ?? 'A').toUpperCase();
+
+  String get situacaoDisplayCode {
+    if (isAgendaCancelada || situacaoCode == 'C') {
+      return 'C';
+    }
+    if (situacaoCode == 'S' || situacaoCode == 'R') {
+      return situacaoCode;
+    }
+    return 'A';
+  }
+
+  String get situacaoDisplayLabel {
+    switch (situacaoDisplayCode) {
+      case 'S':
+        return 'S - Saiu';
+      case 'R':
+        return 'R - Retornou';
+      case 'C':
+        return 'C - Cancelada';
+      case 'A':
+      default:
+        return 'A - Em aberto';
+    }
+  }
 
   AgendaVisualStatus get visualStatus {
     if (isAgendaCancelada) {
@@ -173,6 +211,44 @@ class AgendaCirurgia {
     }
   }
 
+  String get numeroPedidoFormatado => numeroPedido ?? '';
+
+  static DateTime? parseApiDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    final String text = value.toString().trim();
+    if (text.isEmpty) {
+      return null;
+    }
+    final DateTime? iso = DateTime.tryParse(text);
+    if (iso != null) {
+      return iso;
+    }
+    final RegExp brPattern = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})');
+    final Match? brMatch = brPattern.firstMatch(text);
+    if (brMatch != null) {
+      return DateTime(
+        int.parse(brMatch.group(3)!),
+        int.parse(brMatch.group(2)!),
+        int.parse(brMatch.group(1)!),
+      );
+    }
+    final RegExp isoDatePattern = RegExp(r'^(\d{4})-(\d{2})-(\d{2})');
+    final Match? isoMatch = isoDatePattern.firstMatch(text);
+    if (isoMatch != null) {
+      return DateTime(
+        int.parse(isoMatch.group(1)!),
+        int.parse(isoMatch.group(2)!),
+        int.parse(isoMatch.group(3)!),
+      );
+    }
+    return null;
+  }
+
   factory AgendaCirurgia.fromJson(Map<String, dynamic> json) {
     return AgendaCirurgia(
       nummov: json['nummov'] ?? json['NUMMOV'] ?? 0,
@@ -183,18 +259,8 @@ class AgendaCirurgia {
       codconv: json['codconv'] ?? json['CODCONV'],
       nomconv: json['nomconv'] ?? json['NOMCONV'],
       nomcir: json['nomcir'] ?? json['NOMCIR'],
-      datlan: json['datlan'] != null
-          ? DateTime.tryParse(json['datlan']) ??
-              (json['DATLAN'] != null
-                  ? DateTime.tryParse(json['DATLAN'])
-                  : null)
-          : null,
-      datcir: json['datcir'] != null
-          ? DateTime.tryParse(json['datcir']) ??
-              (json['DATCIR'] != null
-                  ? DateTime.tryParse(json['DATCIR'])
-                  : null)
-          : null,
+      datlan: parseApiDate(json['datlan'] ?? json['DATLAN']),
+      datcir: parseApiDate(json['datcir'] ?? json['DATCIR']),
       horcir: json['horcir'] ?? json['HORCIR'],
       codven: json['codven'] ?? json['CODVEN'],
       nomven: json['nomven'] ?? json['NOMVEN'],
@@ -212,7 +278,9 @@ class AgendaCirurgia {
       recebeu: json['recebeu'] ?? json['RECEBEU'],
       numreq: json['numreq'] ?? json['NUMREQ'],
       codcir: json['codcir'] ?? json['CODCIR'],
-      nomcirTipo: json['nomcir_'] ?? json['NOMCIR_'],
+      nomcirTipo: json['tipo_cir_nome'] ??
+          json['nomcir_'] ??
+          json['NOMCIR_'],
       matneg: json['matneg'] ?? json['MATNEG'],
       numaut: json['numaut'] ?? json['NUMAUT'],
       codpac: json['codpac'] ?? json['CODPAC'],
@@ -220,7 +288,13 @@ class AgendaCirurgia {
       lado: json['lado'] ?? json['LADO'],
       horsai: json['horsai'] ?? json['HORSAI'],
       codusu: json['codusu'] ?? json['CODUSU'],
-      primrev: json['primrev'] ?? json['PRIMREV'],
+      nomusu: json['usu_nome'] ?? json['nomusu'] ?? json['NOMUSU'],
+      horlan: json['horlan']?.toString() ?? json['HORLAN']?.toString(),
+      nrelcir: _parseInt(json['nrelcir'] ?? json['NRELCIR']),
+      primrev: json['primrev'] ??
+          json['PRIMREV'] ??
+          json['primaria_revisao'] ??
+          json['PRIMARIA_REVISAO'],
       agendaCancelada: json['agenda_cancelada'] ?? json['AGENDA_CANCELADA'],
       datcirOriginal: json['datcir_original'] != null
           ? DateTime.tryParse(json['datcir_original']) ??
@@ -241,7 +315,18 @@ class AgendaCirurgia {
       motivoCancelamento:
           json['motivo_cancelamento'] ?? json['MOTIVO_CANCELAMENTO'],
       numeroPedido: json['numero_pedido'] ?? json['NUMERO_PEDIDO'],
+      numpedv: _parseInt(json['numpedv'] ?? json['NUMPEDV']),
     );
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return int.tryParse(value.trim());
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
@@ -276,6 +361,9 @@ class AgendaCirurgia {
       'lado': lado,
       'horsai': horsai,
       'codusu': codusu,
+      'nomusu': nomusu,
+      'horlan': horlan,
+      'nrelcir': nrelcir,
       'primrev': primrev,
       'agenda_cancelada': agendaCancelada,
       'datcir_original': datcirOriginal?.toIso8601String(),
@@ -320,6 +408,9 @@ class AgendaCirurgia {
     String? lado,
     String? horsai,
     int? codusu,
+    String? nomusu,
+    String? horlan,
+    int? nrelcir,
     String? primrev,
     String? agendaCancelada,
     DateTime? datcirOriginal,
@@ -362,6 +453,9 @@ class AgendaCirurgia {
       lado: lado ?? this.lado,
       horsai: horsai ?? this.horsai,
       codusu: codusu ?? this.codusu,
+      nomusu: nomusu ?? this.nomusu,
+      horlan: horlan ?? this.horlan,
+      nrelcir: nrelcir ?? this.nrelcir,
       primrev: primrev ?? this.primrev,
       agendaCancelada: agendaCancelada ?? this.agendaCancelada,
       datcirOriginal: datcirOriginal ?? this.datcirOriginal,

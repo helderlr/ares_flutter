@@ -3,7 +3,6 @@ import 'dart:io';
 import '../../features/login/services/auth_service.dart';
 import 'forbidden_exception.dart';
 import 'unauthorized_exception.dart';
-import 'unauthorized_exception.dart';
 
 class HttpRequestHelper {
   static HttpClient createClient() {
@@ -28,7 +27,6 @@ class HttpRequestHelper {
 
   static Future<void> throwIfUnauthorized(int statusCode) async {
     if (statusCode == 401) {
-      await AuthService.handleSessionExpired();
       throw const UnauthorizedException();
     }
     if (statusCode == 403) {

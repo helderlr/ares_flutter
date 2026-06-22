@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -27,6 +29,8 @@ class _SplashPageState extends State<SplashPage>
   late final Animation<double> _fullLogoRevealAnimation;
   late final Animation<double> _titleFadeAnimation;
   late final Animation<Offset> _titleSlideAnimation;
+  Timer? _safetyTimer;
+  bool _completed = false;
 
   @override
   void initState() {
@@ -78,16 +82,28 @@ class _SplashPageState extends State<SplashPage>
     );
     _controller.forward();
     _controller.addStatusListener(_handleAnimationStatus);
+    _safetyTimer = Timer(_totalDuration + const Duration(milliseconds: 500), () {
+      _completeSplash();
+    });
+  }
+
+  void _completeSplash() {
+    if (_completed) {
+      return;
+    }
+    _completed = true;
+    widget.onComplete();
   }
 
   void _handleAnimationStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      widget.onComplete();
+      _completeSplash();
     }
   }
 
   @override
   void dispose() {
+    _safetyTimer?.cancel();
     _controller.removeStatusListener(_handleAnimationStatus);
     _controller.dispose();
     super.dispose();

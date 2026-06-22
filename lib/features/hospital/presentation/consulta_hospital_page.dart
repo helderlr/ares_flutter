@@ -175,6 +175,8 @@ class _ConsultaHospitalPageState extends State<ConsultaHospitalPage> {
                     'Nome', _currentHospital.nomcli.toUpperCase(), true),
                 _buildInfoField(
                     'Nome Fantasia', _currentHospital.fantasyName, true),
+                _buildInfoField(
+                    'Hospital', _currentHospital.hospitalSimNaoLabel, false),
                 _buildInfoField('Endereço', _currentHospital.address, true),
                 _buildInfoField(
                     'Número', _currentHospital.numeroFormatado, true),

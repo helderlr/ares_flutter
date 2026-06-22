@@ -13,10 +13,13 @@ class AppTheme {
     );
   }
 
+  static const double listItemTitleFontSize = 13.0;
+
   static const TextStyle listItemTitleStyle = TextStyle(
-    fontSize: appBarTitleFontSize,
+    fontSize: listItemTitleFontSize,
     fontWeight: FontWeight.w600,
     color: Colors.black87,
+    letterSpacing: 0.1,
   );
 
   static TextStyle listItemSubtitleStyle = TextStyle(

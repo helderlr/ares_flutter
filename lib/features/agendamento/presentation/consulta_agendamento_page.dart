@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/protected_ui.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
 import '../models/agendamento_model.dart';
@@ -27,7 +28,7 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
       TextEditingController();
 
   Future<void> _showCancelamentoDialog() async {
-    return showDialog<void>(
+    return showProtectedDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
@@ -90,7 +91,7 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
     try {
       final motivo = _motivoCancelamentoController.text.trim();
       await _service.cancelarAgendamento(
-        _currentAgendamento.id,
+        _currentAgendamento.nummov,
         motivo,
         DateTime.now(),
       );
@@ -157,12 +158,10 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           tooltip: 'Voltar',
         ),
-        actions: [],
+        bottom: _canEdit && _isReady ? _buildTopActionBar() : null,
       ),
       body: !_isReady || _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -174,81 +173,6 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
                     children: _buildDetailFields(),
                   ),
                 ),
-                if (_canEdit)
-                  SizedBox(
-                    height: 50,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: _showDeleteConfirmation,
-                            child: Container(
-                              color: Colors.lightBlue,
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.delete, color: Colors.white),
-                                  Text(
-                                    'EXCLUIR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: _editAgendamento,
-                            child: Container(
-                              color: Colors.lightBlue,
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.edit, color: Colors.white),
-                                  Text(
-                                    'EDITAR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: _showCancelamentoDialog,
-                            child: Container(
-                              color: Colors.lightBlue,
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.cancel_outlined,
-                                      color: Colors.white),
-                                  Text(
-                                    'CANCELAR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 SizedBox(
                   height: 50,
                   child: InkWell(
@@ -273,27 +197,124 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
     );
   }
 
+  PreferredSizeWidget _buildTopActionBar() {
+    final bool isCancelada =
+        _currentAgendamento.agendaCancelada?.toUpperCase() == 'S';
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(72),
+      child: Container(
+        color: Colors.lightBlue.shade700,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildTopActionItem(
+              icon: Icons.content_copy_outlined,
+              label: 'Copiar',
+              onTap: _copiarAgendamento,
+            ),
+            if (!isCancelada)
+              _buildTopActionItem(
+                icon: Icons.cancel_outlined,
+                label: 'Cancelar',
+                onTap: _showCancelamentoDialog,
+              ),
+            _buildTopActionItem(
+              icon: Icons.edit_outlined,
+              label: 'Editar',
+              onTap: _editAgendamento,
+            ),
+            _buildTopActionItem(
+              icon: Icons.delete_outline,
+              label: 'Excluir',
+              onTap: _showDeleteConfirmation,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopActionItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 26),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copiarAgendamento() async {
+    if (!_canEdit) {
+      return;
+    }
+    final dynamic result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (BuildContext context) => AgendamentoFormPage(
+          copyFrom: _currentAgendamento,
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
   List<Widget> _buildDetailFields() {
     final AgendaCirurgia agendamento = _currentAgendamento;
-    final Color statusColor =
-        AgendaStatusLegend.colorForAgenda(agendamento);
-    final List<Widget> fields = <Widget>[
-      _buildStatusHeader(agendamento.visualStatusLabel, statusColor),
+    return <Widget>[
       _buildInfoField('No Agenda', agendamento.nummov.toString(), false),
-      _buildInfoField('Paciente', agendamento.pacienteName, true),
-      _buildInfoField('Médico', agendamento.medicoName, true),
-      _buildInfoField('Hospital/Clínica', agendamento.hospitalName, true),
-      _buildInfoField('Convênio', agendamento.convenioName, true),
+      _buildInfoField('Paciente', _textOrEmpty(agendamento.nompac), true),
+      _buildInfoField('Médico', _textOrEmpty(agendamento.nommed), true),
+      _buildInfoField('Hospital/Clínica', _textOrEmpty(agendamento.nomcli), true),
+      _buildInfoField('Convênio', _textOrEmpty(agendamento.nomconv), true),
       _buildInfoField(
         'Tipo Cirurgia',
-        agendamento.nomcirTipo ?? agendamento.codcir?.toString() ?? 'Não informado',
+        _textOrEmpty(agendamento.nomcirTipo),
         true,
       ),
-      _buildInfoField('Descrição Cirurgia', agendamento.cirurgiaName, true),
-      _buildInfoField('Data Cirurgia', agendamento.dataCirurgia, true),
-      _buildInfoField('Hora Cirurgia', agendamento.horaCirurgia, true),
-      _buildInfoField('Data Emissão', agendamento.dataEmissao, true),
-      _buildInfoField('Hora Emissão', agendamento.horaEmissao, true),
+      _buildInfoField(
+        'Descrição Cirurgia',
+        _textOrEmpty(agendamento.nomcir),
+        true,
+      ),
+      _buildInfoField(
+        'Data Cirurgia',
+        _formatDate(agendamento.datcir),
+        true,
+      ),
+      _buildInfoField('Hora Cirurgia', _textOrEmpty(agendamento.horcir), true),
+      _buildInfoField(
+        'Data Lançamento',
+        _formatDate(agendamento.datlan),
+        true,
+      ),
+      _buildInfoField('Hora Lancto', _textOrEmpty(agendamento.horlan), true),
+      _buildInfoField(
+        'Digitado por',
+        _textOrEmpty(agendamento.nomusu),
+        true,
+      ),
       _buildInfoField(
         'Primária/Revisão',
         _getPrimariaRevisaoDescription(agendamento.primrev),
@@ -309,117 +330,90 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
         _getSimNaoDescription(agendamento.cirurgiaUrgencia),
         true,
       ),
-      _buildInfoField('Solicitante', agendamento.solicitanteName, true),
+      _buildInfoField(
+        'Solicitante',
+        _textOrEmpty(agendamento.solicitou),
+        true,
+      ),
       _buildInfoField(
         'Lado',
-        agendamento.lado != null && agendamento.lado!.isNotEmpty
+        agendamento.lado != null && agendamento.lado!.trim().isNotEmpty
             ? _getLadoDescription(agendamento.lado!)
-            : 'Não informado',
+            : '',
         true,
       ),
-      _buildInfoField('Material Cirurgia', agendamento.materialCirurgia, true),
-      _buildSituacaoField(agendamento, statusColor),
-      _buildInfoField('Vendedor', agendamento.vendedorName, true),
+      _buildInfoField('Material Cirurgia', _textOrEmpty(agendamento.matcir), true),
+      _buildInfoField(
+        'Situação',
+        agendamento.situacaoDisplayLabel,
+        false,
+      ),
+      _buildInfoField('Vendedor', _textOrEmpty(agendamento.nomven), true),
       _buildInfoField(
         'Data Cirurgia Original',
-        agendamento.dataCirurgiaOriginal,
+        _formatDate(agendamento.datcirOriginal),
         true,
       ),
-      _buildInfoField('Data Saída Material', agendamento.dataSaidaMaterial, true),
-      _buildInfoField('Hora Saída Material', agendamento.horaSaidaMaterial, true),
-      _buildInfoField('Instrumentador', agendamento.instrumentadorName, true),
-      _buildInfoField('Nº Requisição', agendamento.numeroRequisicao, false),
-      _buildInfoField('Nº Pedido', agendamento.numeroPedidoTexto, false),
       _buildInfoField(
-        'Observações',
-        agendamento.obsage?.trim().isNotEmpty == true
-            ? agendamento.obsage!.trim()
-            : 'Não informado',
+        'Data Saída Material',
+        _formatDate(agendamento.datsai),
+        true,
+      ),
+      _buildInfoField('Hora Saída Material', _textOrEmpty(agendamento.horsai), true),
+      _buildInfoField(
+        'Instrumentador',
+        _textOrEmpty(agendamento.nominstru1),
+        true,
+      ),
+      _buildInfoField(
+        'Nº Requisição',
+        agendamento.numreq?.toString() ?? '',
+        false,
+      ),
+      _buildInfoField(
+        'No Rel Cirurgia',
+        agendamento.nrelcir?.toString() ?? '',
+        false,
+      ),
+      _buildInfoField(
+        'Nº Pedido',
+        _textOrEmpty(agendamento.numeroPedido) != ''
+            ? _textOrEmpty(agendamento.numeroPedido)
+            : (agendamento.numpedv?.toString() ?? ''),
+        false,
+      ),
+      _buildInfoField(
+        'Data Cancelamento',
+        _formatDate(agendamento.dataCancelamento),
+        true,
+      ),
+      _buildInfoField(
+        'Hora Cancelamento',
+        _textOrEmpty(agendamento.horaCancelamento),
+        true,
+      ),
+      _buildInfoField(
+        'Motivo Cancelamento',
+        _textOrEmpty(agendamento.motivoCancelamento),
         true,
       ),
     ];
-    if (agendamento.agendaCancelada?.toUpperCase() == 'S') {
-      fields.addAll(<Widget>[
-        _buildInfoField(
-          'Data Cancelamento',
-          agendamento.dataCancelamentoFormatada,
-          true,
-        ),
-        _buildInfoField(
-          'Hora Cancelamento',
-          agendamento.horaCancelamentoFormatada,
-          true,
-        ),
-        _buildInfoField(
-          'Motivo Cancelamento',
-          agendamento.motivoCancelamentoTexto,
-          true,
-        ),
-      ]);
+  }
+
+  String _textOrEmpty(String? value) {
+    if (value == null) {
+      return '';
     }
-    return fields;
+    return value.trim();
   }
 
-  Widget _buildStatusHeader(String label, Color ballColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          AgendaStatusLegend.buildBall(ballColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTheme.consultaLabelStyle.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSituacaoField(AgendaCirurgia agendamento, Color ballColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Situação',
-            style: AppTheme.consultaLabelStyle,
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                AgendaStatusLegend.buildBall(ballColor),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    agendamento.visualStatusLabel,
-                    style: AppTheme.consultaValueStyle(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(
-            color: Colors.grey.shade300,
-            height: 1,
-          ),
-        ],
-      ),
-    );
+  String _formatDate(DateTime? date) {
+    if (date == null) {
+      return '';
+    }
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 
   Widget _buildInfoField(String label, String value, bool isEditable,
@@ -465,26 +459,30 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   }
 
   String _getPrimariaRevisaoDescription(String? primrev) {
-    if (primrev == null || primrev.isEmpty) return 'Não informado';
+    if (primrev == null || primrev.trim().isEmpty) {
+      return '';
+    }
     switch (primrev.toUpperCase()) {
       case 'P':
         return 'Primária';
       case 'R':
         return 'Revisão';
       default:
-        return primrev;
+        return primrev.trim();
     }
   }
 
   String _getSimNaoDescription(String? valor) {
-    if (valor == null || valor.isEmpty) return 'Não informado';
+    if (valor == null || valor.trim().isEmpty) {
+      return '';
+    }
     switch (valor.toUpperCase()) {
       case 'S':
         return 'Sim';
       case 'N':
         return 'Não';
       default:
-        return valor;
+        return valor.trim();
     }
   }
 
@@ -508,7 +506,7 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   }
 
   void _showDeleteConfirmation() {
-    showDialog(
+    showProtectedDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(

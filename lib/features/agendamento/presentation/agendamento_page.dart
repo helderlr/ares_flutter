@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/protected_ui.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/agendamento_model.dart';
+import '../models/agenda_list_filters.dart';
 import '../services/agendamento_service_paginado.dart';
 import '../widgets/agenda_status_legend.dart';
 import 'agendamento_form_page.dart';
@@ -31,16 +33,68 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   // Filtros
   DateTime? _filtroDataInicio;
   DateTime? _filtroDataFim;
+  AgendaDateFilterField _filtroTipoData = AgendaDateFilterField.dataCirurgia;
+  String? _filtroPaciente;
+  String? _filtroNummov;
   String? _filtroMedico;
   String? _filtroConvenio;
   String? _filtroHospital;
   String? _filtroTipoCirurgia;
+  String? _filtroInstrumentador;
+  String? _filtroVendedor;
+  AgendaTriFilter _filtroAgendaCancelada = AgendaTriFilter.todas;
+  AgendaTriFilter _filtroAgendaComPedido = AgendaTriFilter.todas;
   bool _filtrosAtivos = false;
+  final TextEditingController _filtroPacienteController =
+      TextEditingController();
+  final TextEditingController _filtroNummovController = TextEditingController();
+  final TextEditingController _filtroMedicoController = TextEditingController();
+  final TextEditingController _filtroConvenioController = TextEditingController();
+  final TextEditingController _filtroHospitalController = TextEditingController();
+  final TextEditingController _filtroTipoCirurgiaController =
+      TextEditingController();
+  final TextEditingController _filtroInstrumentadorController =
+      TextEditingController();
+  final TextEditingController _filtroVendedorController = TextEditingController();
+
+  AgendaListFilters _buildListFilters() {
+    return AgendaListFilters(
+      dateFrom: _filtroDataInicio,
+      dateTo: _filtroDataFim,
+      dateField: _filtroTipoData,
+      pacienteQuery: _filtroPaciente,
+      nummovQuery: _filtroNummov,
+      medicoQuery: _filtroMedico,
+      convenioQuery: _filtroConvenio,
+      hospitalQuery: _filtroHospital,
+      tipoCirurgiaQuery: _filtroTipoCirurgia,
+      instrumentadorQuery: _filtroInstrumentador,
+      vendedorQuery: _filtroVendedor,
+      agendaCancelada: _filtroAgendaCancelada,
+      agendaComPedido: _filtroAgendaComPedido,
+    );
+  }
+
+  void _normalizeDateFilters() {
+    if (_filtroDataInicio != null && _filtroDataFim != null) {
+      final DateTime inicio = AgendaListFilters.dateOnly(_filtroDataInicio!);
+      final DateTime fim = AgendaListFilters.dateOnly(_filtroDataFim!);
+      if (inicio.isAfter(fim)) {
+        _filtroDataInicio = fim;
+        _filtroDataFim = inicio;
+      }
+    }
+  }
+
+  String _formatFilterDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
 
   @override
   void initState() {
     super.initState();
-    _setTodayFilter();
     _loadFirstPage();
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
@@ -57,6 +111,14 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _filtroPacienteController.dispose();
+    _filtroNummovController.dispose();
+    _filtroMedicoController.dispose();
+    _filtroConvenioController.dispose();
+    _filtroHospitalController.dispose();
+    _filtroTipoCirurgiaController.dispose();
+    _filtroInstrumentadorController.dispose();
+    _filtroVendedorController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
@@ -84,9 +146,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     }
   }
 
-  Future<void> _loadFirstPage() async {
-    print('🔄 _loadFirstPage chamado - _isLoading: $_isLoading');
-    if (_isLoading) return;
+  Future<void> _loadFirstPage({bool force = false}) async {
+    if (_isLoading && !force) {
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -109,6 +172,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         sortBy: 'date',
         sortOrder: 'desc',
         searchQuery: _currentSearchQuery.isEmpty ? null : _currentSearchQuery,
+        filters: _buildListFilters(),
       );
 
       setState(() {
@@ -150,6 +214,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         sortBy: 'date',
         sortOrder: 'desc',
         searchQuery: _currentSearchQuery.isEmpty ? null : _currentSearchQuery,
+        filters: _buildListFilters(),
       );
 
       setState(() {
@@ -174,9 +239,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     _service.clearCache();
     _currentSearchQuery = '';
     _searchController.clear();
-    if (_isFilteringToday() || !_filtrosAtivos) {
-      _setTodayFilter();
-    }
     await _loadFirstPage();
   }
 
@@ -195,7 +257,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   void _navigateToConsulta(AgendaCirurgia agendamento) async {
-    print('🔍 Navegando para consulta do agendamento: ${agendamento.id}');
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ConsultaAgendamentoPage(agendamento: agendamento),
@@ -203,7 +264,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     );
 
     if (result == true) {
-      print('✅ Retornando da consulta - atualizando lista');
       await _refreshAgendamentos();
     }
   }
@@ -347,16 +407,13 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     if (_agendamentos.isEmpty && _isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    final List<AgendaCirurgia> agendamentosFiltrados =
-        _aplicarFiltrosLocais(_agendamentos);
-    if (agendamentosFiltrados.isEmpty && !_isLoading) {
+    if (_agendamentos.isEmpty && !_isLoading) {
       if (_isFilteringToday() &&
           _currentSearchQuery.isEmpty &&
           !_hasOtherFiltersActive()) {
         return _buildTodayEmptyState();
       }
-      if (_agendamentos.isNotEmpty) {
+      if (_filtrosAtivos || _currentSearchQuery.isNotEmpty) {
         return _buildNoResultsState();
       }
       return _buildEmptyState();
@@ -529,17 +586,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _filtroDataInicio = null;
-                _filtroDataFim = null;
-                _filtroMedico = null;
-                _filtroConvenio = null;
-                _filtroHospital = null;
-                _filtroTipoCirurgia = null;
-                _filtrosAtivos = false;
-              });
-            },
+            onPressed: _showAllAgendamentos,
             child: const Text('Limpar Filtros'),
           ),
         ],
@@ -548,25 +595,21 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   Widget _buildAgendamentosList() {
-    // Aplicar filtros locais
-    final agendamentosFiltrados = _aplicarFiltrosLocais(_agendamentos);
-
     return RefreshIndicator(
       onRefresh: _refreshAgendamentos,
       child: ListView.separated(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: agendamentosFiltrados.length + (_isLoading ? 1 : 0),
+        itemCount: _agendamentos.length + (_isLoading ? 1 : 0),
         separatorBuilder: (context, index) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          if (index == agendamentosFiltrados.length) {
+          if (index == _agendamentos.length) {
             return const Padding(
               padding: EdgeInsets.all(16.0),
               child: Center(child: CircularProgressIndicator()),
             );
           }
-
-          final agendamento = agendamentosFiltrados[index];
+          final AgendaCirurgia agendamento = _agendamentos[index];
           return _buildAgendamentoItem(agendamento);
         },
       ),
@@ -574,15 +617,16 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   Widget _buildAgendamentoItem(AgendaCirurgia agendamento) {
-    return InkWell(
-      onTap: () => _navigateToConsulta(agendamento),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-        child: Row(
-          children: [
-            AgendaStatusLegend.buildBallForAgenda(agendamento, size: 28),
-            const SizedBox(width: 16),
-            Expanded(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AgendaStatusLegend.buildBallForAgenda(agendamento, size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: InkWell(
+              onTap: () => _navigateToConsulta(agendamento),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -595,57 +639,39 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                   const SizedBox(height: 4),
                   Text(
                     'No Agenda: ${agendamento.nummov}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Cirurgia: ${agendamento.cirurgiaName}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Data: ${agendamento.dataCirurgia} às ${agendamento.horaCirurgia}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Médico: ${agendamento.medicoName}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Convênio: ${agendamento.convenioName}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Hospital: ${agendamento.nomcli ?? 'Hospital não informado'}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
@@ -653,167 +679,327 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey,
-              size: 16,
-            ),
-          ],
-        ),
+          ),
+          const Icon(
+            Icons.arrow_forward_ios,
+            color: Colors.grey,
+            size: 16,
+          ),
+        ],
       ),
     );
   }
 
   void _showFilterDialog() {
-    showDialog(
+    _filtroPacienteController.text = _filtroPaciente ?? '';
+    _filtroNummovController.text = _filtroNummov ?? '';
+    _filtroMedicoController.text = _filtroMedico ?? '';
+    _filtroConvenioController.text = _filtroConvenio ?? '';
+    _filtroHospitalController.text = _filtroHospital ?? '';
+    _filtroTipoCirurgiaController.text = _filtroTipoCirurgia ?? '';
+    _filtroInstrumentadorController.text = _filtroInstrumentador ?? '';
+    _filtroVendedorController.text = _filtroVendedor ?? '';
+    AgendaDateFilterField dialogTipoData = _filtroTipoData;
+    AgendaTriFilter dialogAgendaCancelada = _filtroAgendaCancelada;
+    AgendaTriFilter dialogAgendaComPedido = _filtroAgendaComPedido;
+    final DateTime maxDate = AgendaListFilters.maxAllowedSurgeryDate();
+    showProtectedDialog<void>(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          builder: (BuildContext context, StateSetter setStateDialog) {
+            final DateTime pickerMinDate =
+                dialogTipoData == AgendaDateFilterField.dataMovto
+                    ? AgendaListFilters.minAllowedMovementDate()
+                    : AgendaListFilters.minAllowedSurgeryDate();
             return AlertDialog(
               title: const Text('Filtros'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Filtro por período de data
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    DropdownButtonFormField<AgendaDateFilterField>(
+                      value: dialogTipoData,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de data',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const <DropdownMenuItem<AgendaDateFilterField>>[
+                        DropdownMenuItem<AgendaDateFilterField>(
+                          value: AgendaDateFilterField.dataCirurgia,
+                          child: Text('Data Cirurgia'),
+                        ),
+                        DropdownMenuItem<AgendaDateFilterField>(
+                          value: AgendaDateFilterField.dataMovto,
+                          child: Text('Data Movto'),
+                        ),
+                      ],
+                      onChanged: (AgendaDateFilterField? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogTipoData = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     const Text(
-                      'Período da Cirurgia:',
+                      'Período:',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate:
-                                    _filtroDataInicio ?? DateTime.now(),
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2030),
-                              );
-                              if (date != null) {
-                                setStateDialog(() {
-                                  _filtroDataInicio = date;
-                                });
-                              }
-                            },
-                            child: Text(_filtroDataInicio != null
-                                ? '${_filtroDataInicio!.day.toString().padLeft(2, '0')}/${_filtroDataInicio!.month.toString().padLeft(2, '0')}/${_filtroDataInicio!.year}'
-                                : 'Data Início'),
-                          ),
-                        ),
-                        const Text(' até '),
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: _filtroDataFim ?? DateTime.now(),
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2030),
-                              );
-                              if (date != null) {
-                                setStateDialog(() {
-                                  _filtroDataFim = date;
-                                });
-                              }
-                            },
-                            child: Text(_filtroDataFim != null
-                                ? '${_filtroDataFim!.day.toString().padLeft(2, '0')}/${_filtroDataFim!.month.toString().padLeft(2, '0')}/${_filtroDataFim!.year}'
-                                : 'Data Fim'),
-                          ),
-                        ),
-                      ],
+                    OutlinedButton(
+                      onPressed: () async {
+                        final DateTime? date = await showProtectedDatePicker(
+                          context: context,
+                          initialDate: _filtroDataInicio ?? pickerMinDate,
+                          firstDate: pickerMinDate,
+                          lastDate: maxDate,
+                        );
+                        if (date != null) {
+                          setStateDialog(() {
+                            _filtroDataInicio = date;
+                          });
+                        }
+                      },
+                      child: Text(
+                        _filtroDataInicio != null
+                            ? 'De: ${_formatFilterDate(_filtroDataInicio!)}'
+                            : 'Data início',
+                      ),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Filtro por médico
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () async {
+                        final DateTime? date = await showProtectedDatePicker(
+                          context: context,
+                          initialDate: _filtroDataFim ?? maxDate,
+                          firstDate: pickerMinDate,
+                          lastDate: maxDate,
+                        );
+                        if (date != null) {
+                          setStateDialog(() {
+                            _filtroDataFim = date;
+                          });
+                        }
+                      },
+                      child: Text(
+                        _filtroDataFim != null
+                            ? 'Até: ${_formatFilterDate(_filtroDataFim!)}'
+                            : 'Data fim',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
+                      controller: _filtroPacienteController,
+                      decoration: const InputDecoration(
+                        labelText: 'Paciente',
+                        hintText: 'Nome do paciente',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _filtroNummovController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'No Agenda',
+                        hintText: 'Número da agenda',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _filtroMedicoController,
                       decoration: const InputDecoration(
                         labelText: 'Médico',
                         hintText: 'Nome do médico',
                         border: OutlineInputBorder(),
+                        isDense: true,
                       ),
-                      onChanged: (value) {
-                        _filtroMedico = value.isEmpty ? null : value;
-                      },
-                      controller:
-                          TextEditingController(text: _filtroMedico ?? ''),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Filtro por convênio
+                    const SizedBox(height: 12),
                     TextField(
+                      controller: _filtroConvenioController,
                       decoration: const InputDecoration(
                         labelText: 'Convênio',
                         hintText: 'Nome do convênio',
                         border: OutlineInputBorder(),
+                        isDense: true,
                       ),
-                      onChanged: (value) {
-                        _filtroConvenio = value.isEmpty ? null : value;
-                      },
-                      controller:
-                          TextEditingController(text: _filtroConvenio ?? ''),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Filtro por hospital
+                    const SizedBox(height: 12),
                     TextField(
+                      controller: _filtroHospitalController,
                       decoration: const InputDecoration(
                         labelText: 'Hospital',
                         hintText: 'Nome do hospital',
                         border: OutlineInputBorder(),
+                        isDense: true,
                       ),
-                      onChanged: (value) {
-                        _filtroHospital = value.isEmpty ? null : value;
-                      },
-                      controller:
-                          TextEditingController(text: _filtroHospital ?? ''),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Filtro por tipo de cirurgia
+                    const SizedBox(height: 12),
                     TextField(
+                      controller: _filtroTipoCirurgiaController,
                       decoration: const InputDecoration(
                         labelText: 'Tipo de Cirurgia',
                         hintText: 'Nome da cirurgia',
                         border: OutlineInputBorder(),
+                        isDense: true,
                       ),
-                      onChanged: (value) {
-                        _filtroTipoCirurgia = value.isEmpty ? null : value;
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _filtroInstrumentadorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Instrumentador',
+                        hintText: 'Nome ou código',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _filtroVendedorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vendedor',
+                        hintText: 'Nome ou código',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: dialogAgendaCancelada,
+                      decoration: const InputDecoration(
+                        labelText: 'Agenda Cancelada',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogAgendaCancelada = value;
+                        });
                       },
-                      controller: TextEditingController(
-                          text: _filtroTipoCirurgia ?? ''),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: dialogAgendaComPedido,
+                      decoration: const InputDecoration(
+                        labelText: 'Agenda com Pedido',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todos'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogAgendaComPedido = value;
+                        });
+                      },
                     ),
                   ],
                 ),
               ),
-              actions: [
+              actions: <Widget>[
                 TextButton(
                   onPressed: () {
                     setStateDialog(() {
                       _filtroDataInicio = null;
                       _filtroDataFim = null;
-                      _filtroMedico = null;
-                      _filtroConvenio = null;
-                      _filtroHospital = null;
-                      _filtroTipoCirurgia = null;
+                      dialogTipoData = AgendaDateFilterField.dataCirurgia;
+                      dialogAgendaCancelada = AgendaTriFilter.todas;
+                      dialogAgendaComPedido = AgendaTriFilter.todas;
                     });
+                    _filtroPacienteController.clear();
+                    _filtroNummovController.clear();
+                    _filtroMedicoController.clear();
+                    _filtroConvenioController.clear();
+                    _filtroHospitalController.clear();
+                    _filtroTipoCirurgiaController.clear();
+                    _filtroInstrumentadorController.clear();
+                    _filtroVendedorController.clear();
                   },
                   child: const Text('Limpar'),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    _filtroTipoData = dialogTipoData;
+                    _filtroAgendaCancelada = dialogAgendaCancelada;
+                    _filtroAgendaComPedido = dialogAgendaComPedido;
+                    _filtroPaciente =
+                        _filtroPacienteController.text.trim().isEmpty
+                            ? null
+                            : _filtroPacienteController.text.trim();
+                    _filtroNummov = _filtroNummovController.text.trim().isEmpty
+                        ? null
+                        : _filtroNummovController.text.trim();
+                    _filtroMedico = _filtroMedicoController.text.trim().isEmpty
+                        ? null
+                        : _filtroMedicoController.text.trim();
+                    _filtroConvenio =
+                        _filtroConvenioController.text.trim().isEmpty
+                            ? null
+                            : _filtroConvenioController.text.trim();
+                    _filtroHospital =
+                        _filtroHospitalController.text.trim().isEmpty
+                            ? null
+                            : _filtroHospitalController.text.trim();
+                    _filtroTipoCirurgia =
+                        _filtroTipoCirurgiaController.text.trim().isEmpty
+                            ? null
+                            : _filtroTipoCirurgiaController.text.trim();
+                    _filtroInstrumentador =
+                        _filtroInstrumentadorController.text.trim().isEmpty
+                            ? null
+                            : _filtroInstrumentadorController.text.trim();
+                    _filtroVendedor =
+                        _filtroVendedorController.text.trim().isEmpty
+                            ? null
+                            : _filtroVendedorController.text.trim();
                     _aplicarFiltros();
-                    Navigator.of(context).pop();
+                    Navigator.of(dialogContext).pop();
                   },
                   child: const Text('Aplicar'),
                 ),
@@ -826,82 +1012,11 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   void _aplicarFiltros() {
+    _normalizeDateFilters();
     setState(() {
-      _filtrosAtivos = _filtroDataInicio != null ||
-          _filtroDataFim != null ||
-          _filtroMedico != null ||
-          _filtroConvenio != null ||
-          _filtroHospital != null ||
-          _filtroTipoCirurgia != null;
+      _filtrosAtivos = _buildListFilters().hasActiveFilters;
     });
-    _loadFirstPage();
-  }
-
-  List<AgendaCirurgia> _aplicarFiltrosLocais(
-      List<AgendaCirurgia> agendamentos) {
-    return agendamentos.where((AgendaCirurgia agendamento) {
-      if (_filtroDataInicio != null || _filtroDataFim != null) {
-        final DateTime? dataCirurgia = agendamento.datcir;
-        if (dataCirurgia == null) {
-          return false;
-        }
-        final DateTime dataSomente = DateTime(
-          dataCirurgia.year,
-          dataCirurgia.month,
-          dataCirurgia.day,
-        );
-        if (_filtroDataInicio != null) {
-          final DateTime inicioSomente = DateTime(
-            _filtroDataInicio!.year,
-            _filtroDataInicio!.month,
-            _filtroDataInicio!.day,
-          );
-          if (dataSomente.isBefore(inicioSomente)) {
-            return false;
-          }
-        }
-        if (_filtroDataFim != null) {
-          final DateTime fimSomente = DateTime(
-            _filtroDataFim!.year,
-            _filtroDataFim!.month,
-            _filtroDataFim!.day,
-          );
-          if (dataSomente.isAfter(fimSomente)) {
-            return false;
-          }
-        }
-      }
-
-      // Filtro por médico
-      if (_filtroMedico != null) {
-        if (!agendamento.medicoName
-            .toLowerCase()
-            .contains(_filtroMedico!.toLowerCase())) return false;
-      }
-
-      // Filtro por convênio
-      if (_filtroConvenio != null) {
-        if (!agendamento.convenioName
-            .toLowerCase()
-            .contains(_filtroConvenio!.toLowerCase())) return false;
-      }
-
-      // Filtro por hospital
-      if (_filtroHospital != null) {
-        final hospital = agendamento.nomcli ?? '';
-        if (!hospital.toLowerCase().contains(_filtroHospital!.toLowerCase()))
-          return false;
-      }
-
-      // Filtro por tipo de cirurgia
-      if (_filtroTipoCirurgia != null) {
-        if (!agendamento.cirurgiaName
-            .toLowerCase()
-            .contains(_filtroTipoCirurgia!.toLowerCase())) return false;
-      }
-
-      return true;
-    }).toList();
+    _loadFirstPage(force: true);
   }
 
   String _formatDateDisplay(DateTime date) {
@@ -923,31 +1038,56 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   bool _hasOtherFiltersActive() {
-    return _filtroMedico != null ||
+    return _filtroPaciente != null ||
+        _filtroNummov != null ||
+        _filtroMedico != null ||
         _filtroConvenio != null ||
         _filtroHospital != null ||
-        _filtroTipoCirurgia != null;
+        _filtroTipoCirurgia != null ||
+        _filtroInstrumentador != null ||
+        _filtroVendedor != null ||
+        _filtroTipoData != AgendaDateFilterField.dataCirurgia ||
+        _filtroAgendaCancelada != AgendaTriFilter.todas ||
+        _filtroAgendaComPedido != AgendaTriFilter.todas;
+  }
+
+  void _clearTextFilters() {
+    _filtroPaciente = null;
+    _filtroNummov = null;
+    _filtroMedico = null;
+    _filtroConvenio = null;
+    _filtroHospital = null;
+    _filtroTipoCirurgia = null;
+    _filtroInstrumentador = null;
+    _filtroVendedor = null;
+    _filtroTipoData = AgendaDateFilterField.dataCirurgia;
+    _filtroAgendaCancelada = AgendaTriFilter.todas;
+    _filtroAgendaComPedido = AgendaTriFilter.todas;
+    _filtroPacienteController.clear();
+    _filtroNummovController.clear();
+    _filtroMedicoController.clear();
+    _filtroConvenioController.clear();
+    _filtroHospitalController.clear();
+    _filtroTipoCirurgiaController.clear();
+    _filtroInstrumentadorController.clear();
+    _filtroVendedorController.clear();
   }
 
   void _showAllAgendamentos() {
     setState(() {
       _filtroDataInicio = null;
       _filtroDataFim = null;
-      _filtroMedico = null;
-      _filtroConvenio = null;
-      _filtroHospital = null;
-      _filtroTipoCirurgia = null;
+      _clearTextFilters();
       _filtrosAtivos = false;
     });
+    _loadFirstPage(force: true);
   }
 
   void _filterTodayAgendamentos() {
     setState(() {
       _setTodayFilter();
-      _filtroMedico = null;
-      _filtroConvenio = null;
-      _filtroHospital = null;
-      _filtroTipoCirurgia = null;
+      _clearTextFilters();
     });
+    _loadFirstPage(force: true);
   }
 }
