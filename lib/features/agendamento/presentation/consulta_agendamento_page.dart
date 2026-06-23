@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/protected_ui.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../models/agendamento_model.dart';
 import '../services/agendamento_service.dart';
-import '../widgets/agenda_status_legend.dart';
 import 'agendamento_form_page.dart';
 
 class ConsultaAgendamentoPage extends StatefulWidget {
@@ -22,7 +22,12 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   final AgendamentoService _service = AgendamentoService();
   late AgendaCirurgia _currentAgendamento;
   bool _isLoading = false;
-  bool _canEdit = false;
+  AgendaAccess _access = const AgendaAccess(
+    canCopy: false,
+    canEdit: false,
+    canCancel: false,
+    canDelete: false,
+  );
   bool _isReady = false;
   final TextEditingController _motivoCancelamentoController =
       TextEditingController();
@@ -139,12 +144,12 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   }
 
   Future<void> _loadPermissions() async {
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentAgendamento.canEditByUser(loggedCodusu);
+      _access = _currentAgendamento.evaluateAccess(permissions);
       _isReady = true;
     });
   }
@@ -161,45 +166,81 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
           onPressed: () => Navigator.of(context).pop(),
           tooltip: 'Voltar',
         ),
-        bottom: _canEdit && _isReady ? _buildTopActionBar() : null,
+        bottom: _access.hasAnyAction && _isReady ? _buildTopActionBar() : null,
       ),
       body: !_isReady || _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
+          : ListView(
+              padding: const EdgeInsets.all(16.0),
               children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16.0),
-                    children: _buildDetailFields(),
-                  ),
-                ),
-                SizedBox(
-                  height: 50,
-                  child: InkWell(
-                    onTap: () => AgendaStatusLegend.showLegendDialog(context),
-                    child: Container(
-                      width: double.infinity,
-                      color: Colors.lightBlue.shade700,
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'Legenda',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                ..._buildAlertBanners(),
+                ..._buildDetailFields(),
               ],
             ),
     );
   }
 
+  List<Widget> _buildAlertBanners() {
+    final List<Widget> banners = <Widget>[];
+    if (_access.otherUserMessage != null) {
+      banners.add(_buildAlertBanner(
+        _access.otherUserMessage!,
+        Colors.orange.shade50,
+        Colors.orange.shade800,
+        Icons.person_outline,
+      ));
+    }
+    if (_access.situacaoBlockReason != null) {
+      banners.add(_buildAlertBanner(
+        _access.situacaoBlockReason!,
+        Colors.red.shade50,
+        Colors.red.shade800,
+        Icons.info_outline,
+      ));
+    }
+    if (banners.isEmpty) {
+      return banners;
+    }
+    banners.add(const SizedBox(height: 8));
+    return banners;
+  }
+
+  Widget _buildAlertBanner(
+    String message,
+    Color backgroundColor,
+    Color textColor,
+    IconData icon,
+  ) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: textColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: textColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   PreferredSizeWidget _buildTopActionBar() {
-    final bool isCancelada =
-        _currentAgendamento.agendaCancelada?.toUpperCase() == 'S';
     return PreferredSize(
       preferredSize: const Size.fromHeight(72),
       child: Container(
@@ -208,27 +249,30 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildTopActionItem(
-              icon: Icons.content_copy_outlined,
-              label: 'Copiar',
-              onTap: _copiarAgendamento,
-            ),
-            if (!isCancelada)
+            if (_access.canCopy)
+              _buildTopActionItem(
+                icon: Icons.content_copy_outlined,
+                label: 'Copiar',
+                onTap: _copiarAgendamento,
+              ),
+            if (_access.canCancel)
               _buildTopActionItem(
                 icon: Icons.cancel_outlined,
                 label: 'Cancelar',
                 onTap: _showCancelamentoDialog,
               ),
-            _buildTopActionItem(
-              icon: Icons.edit_outlined,
-              label: 'Editar',
-              onTap: _editAgendamento,
-            ),
-            _buildTopActionItem(
-              icon: Icons.delete_outline,
-              label: 'Excluir',
-              onTap: _showDeleteConfirmation,
-            ),
+            if (_access.canEdit)
+              _buildTopActionItem(
+                icon: Icons.edit_outlined,
+                label: 'Editar',
+                onTap: _editAgendamento,
+              ),
+            if (_access.canDelete)
+              _buildTopActionItem(
+                icon: Icons.delete_outline,
+                label: 'Excluir',
+                onTap: _showDeleteConfirmation,
+              ),
           ],
         ),
       ),
@@ -265,7 +309,7 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   }
 
   void _copiarAgendamento() async {
-    if (!_canEdit) {
+    if (!_access.canCopy) {
       return;
     }
     final dynamic result = await Navigator.of(context).push(
@@ -487,7 +531,7 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   }
 
   void _editAgendamento() async {
-    if (!_canEdit) {
+    if (!_access.canEdit) {
       return;
     }
     final result = await Navigator.of(context).push(

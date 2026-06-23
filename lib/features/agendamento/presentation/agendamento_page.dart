@@ -44,6 +44,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   String? _filtroVendedor;
   AgendaTriFilter _filtroAgendaCancelada = AgendaTriFilter.todas;
   AgendaTriFilter _filtroAgendaComPedido = AgendaTriFilter.todas;
+  AgendaTriFilter _filtroAgendaComRelatorio = AgendaTriFilter.todas;
+  AgendaTriFilter _filtroAgendaCopia = AgendaTriFilter.todas;
+  AgendaTipmarFilter _filtroTipoMarcacao = AgendaTipmarFilter.todas;
+  AgendaLadoFilter _filtroLado = AgendaLadoFilter.todas;
   bool _filtrosAtivos = false;
   final TextEditingController _filtroPacienteController =
       TextEditingController();
@@ -72,6 +76,19 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       vendedorQuery: _filtroVendedor,
       agendaCancelada: _filtroAgendaCancelada,
       agendaComPedido: _filtroAgendaComPedido,
+      agendaComRelatorio: _filtroAgendaComRelatorio,
+      agendaCopia: _filtroAgendaCopia,
+      tipoMarcacao: _filtroTipoMarcacao,
+      lado: _filtroLado,
+    );
+  }
+
+  InputDecoration _buildFilterDecoration(String labelText) {
+    return InputDecoration(
+      labelText: labelText,
+      border: const OutlineInputBorder(),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
     );
   }
 
@@ -702,6 +719,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     AgendaDateFilterField dialogTipoData = _filtroTipoData;
     AgendaTriFilter dialogAgendaCancelada = _filtroAgendaCancelada;
     AgendaTriFilter dialogAgendaComPedido = _filtroAgendaComPedido;
+    AgendaTriFilter dialogAgendaComRelatorio = _filtroAgendaComRelatorio;
+    AgendaTriFilter dialogAgendaCopia = _filtroAgendaCopia;
+    AgendaTipmarFilter dialogTipoMarcacao = _filtroTipoMarcacao;
+    AgendaLadoFilter dialogLado = _filtroLado;
     final DateTime maxDate = AgendaListFilters.maxAllowedSurgeryDate();
     showProtectedDialog<void>(
       context: context,
@@ -715,17 +736,15 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
             return AlertDialog(
               title: const Text('Filtros'),
               content: SingleChildScrollView(
-                child: Column(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     DropdownButtonFormField<AgendaDateFilterField>(
                       value: dialogTipoData,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de data',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      decoration: _buildFilterDecoration('Tipo de data'),
                       items: const <DropdownMenuItem<AgendaDateFilterField>>[
                         DropdownMenuItem<AgendaDateFilterField>(
                           value: AgendaDateFilterField.dataCirurgia,
@@ -795,92 +814,99 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroPacienteController,
-                      decoration: const InputDecoration(
-                        labelText: 'Paciente',
+                      decoration: _buildFilterDecoration('Paciente').copyWith(
                         hintText: 'Nome do paciente',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroNummovController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'No Agenda',
+                      decoration: _buildFilterDecoration('No Agenda').copyWith(
                         hintText: 'Número da agenda',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroMedicoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Médico',
+                      decoration: _buildFilterDecoration('Médico').copyWith(
                         hintText: 'Nome do médico',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroConvenioController,
-                      decoration: const InputDecoration(
-                        labelText: 'Convênio',
+                      decoration: _buildFilterDecoration('Convênio').copyWith(
                         hintText: 'Nome do convênio',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroHospitalController,
-                      decoration: const InputDecoration(
-                        labelText: 'Hospital',
+                      decoration: _buildFilterDecoration('Hospital').copyWith(
                         hintText: 'Nome do hospital',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroTipoCirurgiaController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de Cirurgia',
+                      decoration: _buildFilterDecoration('Tipo de Cirurgia').copyWith(
                         hintText: 'Nome da cirurgia',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroInstrumentadorController,
-                      decoration: const InputDecoration(
-                        labelText: 'Instrumentador',
+                      decoration: _buildFilterDecoration('Instrumentador').copyWith(
                         hintText: 'Nome ou código',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _filtroVendedorController,
-                      decoration: const InputDecoration(
-                        labelText: 'Vendedor',
+                      decoration: _buildFilterDecoration('Vendedor').copyWith(
                         hintText: 'Nome ou código',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTipmarFilter>(
+                      value: dialogTipoMarcacao,
+                      decoration: _buildFilterDecoration('Tipo Marcação'),
+                      items: const <DropdownMenuItem<AgendaTipmarFilter>>[
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.app,
+                          child: Text('A - App'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.web,
+                          child: Text('W - Web'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.desktop,
+                          child: Text('Vazio - Desktop'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.googleAgenda,
+                          child: Text('Google Agenda'),
+                        ),
+                      ],
+                      onChanged: (AgendaTipmarFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogTipoMarcacao = value;
+                        });
+                      },
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<AgendaTriFilter>(
                       value: dialogAgendaCancelada,
-                      decoration: const InputDecoration(
-                        labelText: 'Agenda Cancelada',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      decoration: _buildFilterDecoration('Agenda Cancelada'),
                       items: const <DropdownMenuItem<AgendaTriFilter>>[
                         DropdownMenuItem<AgendaTriFilter>(
                           value: AgendaTriFilter.todas,
@@ -907,11 +933,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<AgendaTriFilter>(
                       value: dialogAgendaComPedido,
-                      decoration: const InputDecoration(
-                        labelText: 'Agenda com Pedido',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
+                      decoration: _buildFilterDecoration('Agenda com Pedido'),
                       items: const <DropdownMenuItem<AgendaTriFilter>>[
                         DropdownMenuItem<AgendaTriFilter>(
                           value: AgendaTriFilter.todas,
@@ -935,7 +957,93 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                         });
                       },
                     ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: dialogAgendaComRelatorio,
+                      decoration: _buildFilterDecoration('Agenda com Relatório'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogAgendaComRelatorio = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: dialogAgendaCopia,
+                      decoration: _buildFilterDecoration('Cópia Agenda'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogAgendaCopia = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaLadoFilter>(
+                      value: dialogLado,
+                      decoration: _buildFilterDecoration('Lado'),
+                      items: const <DropdownMenuItem<AgendaLadoFilter>>[
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.esquerdo,
+                          child: Text('Esquerdo'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.direito,
+                          child: Text('Direito'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.vazio,
+                          child: Text('Vazio'),
+                        ),
+                      ],
+                      onChanged: (AgendaLadoFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogLado = value;
+                        });
+                      },
+                    ),
                   ],
+                ),
                 ),
               ),
               actions: <Widget>[
@@ -947,6 +1055,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                       dialogTipoData = AgendaDateFilterField.dataCirurgia;
                       dialogAgendaCancelada = AgendaTriFilter.todas;
                       dialogAgendaComPedido = AgendaTriFilter.todas;
+                      dialogAgendaComRelatorio = AgendaTriFilter.todas;
+                      dialogAgendaCopia = AgendaTriFilter.todas;
+                      dialogTipoMarcacao = AgendaTipmarFilter.todas;
+                      dialogLado = AgendaLadoFilter.todas;
                     });
                     _filtroPacienteController.clear();
                     _filtroNummovController.clear();
@@ -968,6 +1080,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     _filtroTipoData = dialogTipoData;
                     _filtroAgendaCancelada = dialogAgendaCancelada;
                     _filtroAgendaComPedido = dialogAgendaComPedido;
+                    _filtroAgendaComRelatorio = dialogAgendaComRelatorio;
+                    _filtroAgendaCopia = dialogAgendaCopia;
+                    _filtroTipoMarcacao = dialogTipoMarcacao;
+                    _filtroLado = dialogLado;
                     _filtroPaciente =
                         _filtroPacienteController.text.trim().isEmpty
                             ? null
@@ -1048,7 +1164,11 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         _filtroVendedor != null ||
         _filtroTipoData != AgendaDateFilterField.dataCirurgia ||
         _filtroAgendaCancelada != AgendaTriFilter.todas ||
-        _filtroAgendaComPedido != AgendaTriFilter.todas;
+        _filtroAgendaComPedido != AgendaTriFilter.todas ||
+        _filtroAgendaComRelatorio != AgendaTriFilter.todas ||
+        _filtroAgendaCopia != AgendaTriFilter.todas ||
+        _filtroTipoMarcacao != AgendaTipmarFilter.todas ||
+        _filtroLado != AgendaLadoFilter.todas;
   }
 
   void _clearTextFilters() {
@@ -1063,6 +1183,10 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     _filtroTipoData = AgendaDateFilterField.dataCirurgia;
     _filtroAgendaCancelada = AgendaTriFilter.todas;
     _filtroAgendaComPedido = AgendaTriFilter.todas;
+    _filtroAgendaComRelatorio = AgendaTriFilter.todas;
+    _filtroAgendaCopia = AgendaTriFilter.todas;
+    _filtroTipoMarcacao = AgendaTipmarFilter.todas;
+    _filtroLado = AgendaLadoFilter.todas;
     _filtroPacienteController.clear();
     _filtroNummovController.clear();
     _filtroMedicoController.clear();

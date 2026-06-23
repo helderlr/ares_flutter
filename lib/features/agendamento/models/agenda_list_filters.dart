@@ -9,6 +9,21 @@ enum AgendaDateFilterField {
   dataMovto,
 }
 
+enum AgendaTipmarFilter {
+  todas,
+  app,
+  web,
+  desktop,
+  googleAgenda,
+}
+
+enum AgendaLadoFilter {
+  todas,
+  esquerdo,
+  direito,
+  vazio,
+}
+
 class AgendaListFilters {
   final DateTime? dateFrom;
   final DateTime? dateTo;
@@ -23,6 +38,10 @@ class AgendaListFilters {
   final String? vendedorQuery;
   final AgendaTriFilter agendaCancelada;
   final AgendaTriFilter agendaComPedido;
+  final AgendaTriFilter agendaComRelatorio;
+  final AgendaTriFilter agendaCopia;
+  final AgendaTipmarFilter tipoMarcacao;
+  final AgendaLadoFilter lado;
 
   const AgendaListFilters({
     this.dateFrom,
@@ -38,6 +57,10 @@ class AgendaListFilters {
     this.vendedorQuery,
     this.agendaCancelada = AgendaTriFilter.todas,
     this.agendaComPedido = AgendaTriFilter.todas,
+    this.agendaComRelatorio = AgendaTriFilter.todas,
+    this.agendaCopia = AgendaTriFilter.todas,
+    this.tipoMarcacao = AgendaTipmarFilter.todas,
+    this.lado = AgendaLadoFilter.todas,
   });
 
   static DateTime minAllowedSurgeryDate() {
@@ -80,7 +103,11 @@ class AgendaListFilters {
 
   bool get hasTriFilters =>
       agendaCancelada != AgendaTriFilter.todas ||
-      agendaComPedido != AgendaTriFilter.todas;
+      agendaComPedido != AgendaTriFilter.todas ||
+      agendaComRelatorio != AgendaTriFilter.todas ||
+      agendaCopia != AgendaTriFilter.todas ||
+      tipoMarcacao != AgendaTipmarFilter.todas ||
+      lado != AgendaLadoFilter.todas;
 
   bool get hasActiveFilters =>
       hasUserDateRange || hasTextFilters || hasTriFilters;

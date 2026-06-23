@@ -1,9 +1,33 @@
+import '../../../core/permissions/user_permissions.dart';
+
 enum AgendaVisualStatus {
   cancelada,
   materialSaiu,
   remarcada,
   retornou,
   emAberto,
+}
+
+class AgendaAccess {
+  final bool canCopy;
+  final bool canEdit;
+  final bool canCancel;
+  final bool canDelete;
+  final String? situacaoBlockReason;
+  final bool isOtherUser;
+  final String? otherUserMessage;
+
+  const AgendaAccess({
+    required this.canCopy,
+    required this.canEdit,
+    required this.canCancel,
+    required this.canDelete,
+    this.situacaoBlockReason,
+    this.isOtherUser = false,
+    this.otherUserMessage,
+  });
+
+  bool get hasAnyAction => canCopy || canEdit || canCancel || canDelete;
 }
 
 class AgendaCirurgia {
@@ -143,11 +167,73 @@ class AgendaCirurgia {
           int.tryParse(numeroPedido!.trim()) != null &&
           int.parse(numeroPedido!.trim()) > 0);
 
-  bool canEditByUser(int? loggedCodusu) {
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return evaluateAccess(
+      UserPermissions(
+        codusu: loggedCodusu,
+        isAdmin: isAdmin,
+        isActive: isUserActive,
+      ),
+    ).canEdit;
+  }
+
+  bool isDigitadaPorOutroUsuario(int? loggedCodusu) {
     if (loggedCodusu == null || codusu == null) {
       return false;
     }
-    return codusu == loggedCodusu;
+    return codusu != loggedCodusu;
+  }
+
+  String get digitadorLabel {
+    final String nome = nomusu?.trim() ?? '';
+    if (nome.isNotEmpty && codusu != null) {
+      return '$nome (cód. $codusu)';
+    }
+    if (codusu != null) {
+      return 'cód. $codusu';
+    }
+    return nome;
+  }
+
+  static String? situacaoBlockReason(AgendaCirurgia agenda) {
+    if (agenda.isAgendaCancelada || agenda.situacaoCode == 'C') {
+      return 'Agenda cirurgia cancelada';
+    }
+    if (agenda.situacaoCode == 'R') {
+      return 'Agenda cirurgia já retornou';
+    }
+    if (agenda.situacaoCode == 'S') {
+      return 'Agenda cirurgia já saiu';
+    }
+    return null;
+  }
+
+  AgendaAccess evaluateAccess(UserPermissions user) {
+    final String? situacaoBlock = situacaoBlockReason(this);
+    final bool isOtherUser = isDigitadaPorOutroUsuario(user.codusu);
+    final bool owner = user.codusu != null &&
+        codusu != null &&
+        user.codusu == codusu;
+    final bool canCopy = user.canPerformEdits &&
+        (owner || user.isAdmin);
+    final bool canModify = user.canPerformEdits &&
+        situacaoBlock == null &&
+        (owner || user.isAdmin);
+    return AgendaAccess(
+      canCopy: canCopy,
+      canEdit: canModify,
+      canCancel: canModify && !isAgendaCancelada,
+      canDelete: canModify,
+      situacaoBlockReason: situacaoBlock,
+      isOtherUser: isOtherUser,
+      otherUserMessage: isOtherUser
+          ? 'Esta agenda cirurgia foi digitada pelo usuário $digitadorLabel'
+          : null,
+    );
   }
 
   bool get isAgendaCancelada => agendaCancelada?.toUpperCase() == 'S';

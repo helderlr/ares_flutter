@@ -6,6 +6,7 @@ import '../../../core/config/api_config.dart';
 import '../../../core/utils/jwt_helper.dart';
 import '../models/empresa_model.dart';
 import '../models/user_model.dart';
+import '../../../core/permissions/user_permissions.dart';
 
 class LoginResult {
   final bool success;
@@ -372,6 +373,16 @@ class AuthService {
     }
   }
 
+  static Future<UserPermissions> getUserPermissions() async {
+    final UserModel? user = await getCurrentUser();
+    final int? codusu = await getCurrentCodusu();
+    return UserPermissions(
+      codusu: codusu,
+      isAdmin: user?.isAdmin ?? false,
+      isActive: user?.isActive ?? true,
+    );
+  }
+
   static Future<int?> getCurrentCodusu() async {
     final EmpresaModel? empresa = await getCurrentEmpresa();
     if (empresa?.codusu != null && empresa!.codusu! > 0) {
@@ -492,6 +503,53 @@ class AuthService {
       return true;
     }
     return authorizedIds.contains(empresaId);
+  }
+
+  static Future<void> refreshUserProfileFromServer() async {
+    if (!ApiConfig.jwtRequired) {
+      return;
+    }
+    final String? token = await getToken();
+    if (token == null || token.isEmpty) {
+      return;
+    }
+    final UserModel? user = await getCurrentUser();
+    if (user == null) {
+      return;
+    }
+    try {
+      final http.Response response = await http
+          .get(
+            Uri.parse(ApiConfig.meUrl),
+            headers: <String, String>{
+              'Accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) {
+        return;
+      }
+      final Map<String, dynamic>? decoded = tryDecodeJson(response.body);
+      final Map<String, dynamic>? usuarioJson =
+          decoded?['usuario'] as Map<String, dynamic>?;
+      if (usuarioJson == null) {
+        return;
+      }
+      final int? codusuFromApi = usuarioJson['codusu'] is int
+          ? usuarioJson['codusu'] as int
+          : int.tryParse(usuarioJson['codusu']?.toString() ?? '');
+      final UserModel updated = user.copyWith(
+        admsis: usuarioJson['admsis']?.toString(),
+        ativo: usuarioJson['ativo']?.toString(),
+        codusu: codusuFromApi ?? user.codusu,
+      );
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _sessionUsuarioKey,
+        jsonEncode(updated.toJson()),
+      );
+    } catch (_) {}
   }
 
   static Future<void> repairSessionCodusuIfNeeded() async {

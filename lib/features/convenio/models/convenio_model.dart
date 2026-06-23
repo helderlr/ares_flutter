@@ -1,3 +1,5 @@
+import '../../../core/permissions/user_permissions.dart';
+
 class Convenio {
   final int codcon;
   final String nomcon;
@@ -5,6 +7,7 @@ class Convenio {
   final String? endcon;
   final String? fonecon;
   final int? codUsu;
+  final String? ativo;
 
   const Convenio({
     required this.codcon,
@@ -13,6 +16,7 @@ class Convenio {
     this.endcon,
     this.fonecon,
     this.codUsu,
+    this.ativo,
   });
 
   int get id => codcon;
@@ -21,11 +25,16 @@ class Convenio {
   String get address => endcon ?? 'Endereço não disponível';
   String get phone => fonecon ?? 'Telefone não disponível';
 
-  bool canEditByUser(int? loggedCodusu) {
-    if (loggedCodusu == null || codUsu == null) {
-      return false;
-    }
-    return codUsu == loggedCodusu;
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return UserPermissions(
+      codusu: loggedCodusu,
+      isAdmin: isAdmin,
+      isActive: isUserActive,
+    ).canEditRecord(recordCodusu: codUsu, recordAtivo: ativo);
   }
 
   factory Convenio.fromJson(Map<String, dynamic> json) {
@@ -45,6 +54,7 @@ class Convenio {
       endcon: endereco is String && endereco.isNotEmpty ? endereco : null,
       fonecon: telefone is String && telefone.isNotEmpty ? telefone : null,
       codUsu: _parseCodUsu(json['cod_usu'] ?? json['codusu'] ?? json['COD_USU']),
+      ativo: json['ativo']?.toString(),
     );
   }
 

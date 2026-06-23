@@ -1,9 +1,12 @@
+import '../../../core/permissions/user_permissions.dart';
+
 class TipoCirurgia {
   final int codcir;
   final String nomcir;
   final String? descir;
   final double? valcir;
   final int? codUsu;
+  final String? ativo;
 
   const TipoCirurgia({
     required this.codcir,
@@ -11,6 +14,7 @@ class TipoCirurgia {
     this.descir,
     this.valcir,
     this.codUsu,
+    this.ativo,
   });
 
   int get id => codcir;
@@ -20,11 +24,16 @@ class TipoCirurgia {
       ? 'R\$ ${valcir!.toStringAsFixed(2)}'
       : 'Valor não disponível';
 
-  bool canEditByUser(int? loggedCodusu) {
-    if (loggedCodusu == null || codUsu == null) {
-      return false;
-    }
-    return codUsu == loggedCodusu;
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return UserPermissions(
+      codusu: loggedCodusu,
+      isAdmin: isAdmin,
+      isActive: isUserActive,
+    ).canEditRecord(recordCodusu: codUsu, recordAtivo: ativo);
   }
 
   factory TipoCirurgia.fromJson(Map<String, dynamic> json) {
@@ -46,6 +55,7 @@ class TipoCirurgia {
               ? valor.toDouble()
               : (valor is String ? double.tryParse(valor) : null)),
       codUsu: _parseCodUsu(json['cod_usu'] ?? json['codusu'] ?? json['COD_USU']),
+      ativo: json['ativo']?.toString(),
     );
   }
 

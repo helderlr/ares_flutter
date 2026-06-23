@@ -101,6 +101,7 @@ class AgendamentoService {
       if (codcir != null && codcir > 0) 'codcir': codcir,
       if (codusu != null && codusu > 0) 'codusu': codusu,
       if (numageOrigem != null && numageOrigem > 0) 'numage_origem': numageOrigem,
+      'tipmar': 'A',
       'datlan': _formatDateToApi(DateTime.now()),
     };
     final HttpClient httpClient = HttpRequestHelper.createClient();

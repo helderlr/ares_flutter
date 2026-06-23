@@ -1,3 +1,5 @@
+import '../../../core/permissions/user_permissions.dart';
+
 class Hospital {
   final int codcli;
   final String nomcli;
@@ -8,6 +10,7 @@ class Hospital {
   final String? cpfcli;
   final String? clihos;
   final int? codUsu;
+  final String? ativo;
   // Novos campos de endereço (nomes corretos da API)
   final String? baicli; // bairro
   final String? cidcli; // cidade
@@ -26,6 +29,7 @@ class Hospital {
     this.cpfcli,
     this.clihos,
     this.codUsu,
+    this.ativo,
     this.baicli,
     this.cidcli,
     this.estcli,
@@ -48,11 +52,16 @@ class Hospital {
 
   String get hospitalSimNaoLabel => isHospital ? 'Sim' : 'Não';
 
-  bool canEditByUser(int? loggedCodusu) {
-    if (loggedCodusu == null || codUsu == null) {
-      return false;
-    }
-    return codUsu == loggedCodusu;
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return UserPermissions(
+      codusu: loggedCodusu,
+      isAdmin: isAdmin,
+      isActive: isUserActive,
+    ).canEditRecord(recordCodusu: codUsu, recordAtivo: ativo);
   }
 
   // Novos getters
@@ -91,6 +100,7 @@ class Hospital {
           : null,
       clihos: _parseClihos(json['clihos'] ?? json['CLIHOS']),
       codUsu: _parseCodUsu(json['cod_usu'] ?? json['codusu'] ?? json['COD_USU']),
+      ativo: json['ativo']?.toString(),
       baicli: json['baicli'] is String && json['baicli'].isNotEmpty
           ? json['baicli']
           : null,

@@ -95,7 +95,53 @@ class AgendamentoServicePaginado {
     _appendQueryParam(extra, 'vendedor', filters.vendedorQuery);
     extra['agendaCancelada'] = _triFilterToParam(filters.agendaCancelada);
     extra['agendaComPedido'] = _triFilterToParam(filters.agendaComPedido);
+    _appendTriFilter(extra, 'agendaComRelatorio', filters.agendaComRelatorio);
+    _appendTriFilter(extra, 'agendaCopia', filters.agendaCopia);
+    if (filters.tipoMarcacao != AgendaTipmarFilter.todas) {
+      extra['tipoMarcacao'] = _tipmarFilterToParam(filters.tipoMarcacao);
+    }
+    if (filters.lado != AgendaLadoFilter.todas) {
+      extra['lado'] = _ladoFilterToParam(filters.lado);
+    }
     return extra;
+  }
+
+  void _appendTriFilter(
+    Map<String, String> extra,
+    String key,
+    AgendaTriFilter filter,
+  ) {
+    if (filter != AgendaTriFilter.todas) {
+      extra[key] = _triFilterToParam(filter);
+    }
+  }
+
+  String _ladoFilterToParam(AgendaLadoFilter filter) {
+    switch (filter) {
+      case AgendaLadoFilter.esquerdo:
+        return 'E';
+      case AgendaLadoFilter.direito:
+        return 'D';
+      case AgendaLadoFilter.vazio:
+        return 'V';
+      case AgendaLadoFilter.todas:
+        return 'T';
+    }
+  }
+
+  String _tipmarFilterToParam(AgendaTipmarFilter filter) {
+    switch (filter) {
+      case AgendaTipmarFilter.app:
+        return 'A';
+      case AgendaTipmarFilter.web:
+        return 'W';
+      case AgendaTipmarFilter.desktop:
+        return 'D';
+      case AgendaTipmarFilter.googleAgenda:
+        return 'G';
+      case AgendaTipmarFilter.todas:
+        return 'T';
+    }
   }
 
   void _appendQueryParam(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../services/convenio_service.dart';
 import '../models/convenio_model.dart';
 import 'convenio_form_page.dart';
@@ -30,12 +31,16 @@ class _ConsultaConvenioPageState extends State<ConsultaConvenioPage> {
   }
 
   Future<void> _loadPermissions() async {
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentConvenio.canEditByUser(loggedCodusu);
+      _canEdit = _currentConvenio.canEditByUser(
+        permissions.codusu,
+        isAdmin: permissions.isAdmin,
+        isUserActive: permissions.isActive,
+      );
       _isReady = true;
     });
   }

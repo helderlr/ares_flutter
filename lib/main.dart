@@ -225,6 +225,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   Future<void> _runPostLoginStartup() async {
     await AuthService.repairSessionCodusuIfNeeded();
+    await AuthService.refreshUserProfileFromServer();
     unawaited(AcessoLogService.registerAppAccess());
     _validateSessionInBackground();
     WidgetsBinding.instance.addPostFrameCallback((_) {

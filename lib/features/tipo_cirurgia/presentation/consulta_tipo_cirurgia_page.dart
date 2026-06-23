@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../services/tipo_cirurgia_service.dart';
 import '../models/tipo_cirurgia_model.dart';
 import 'tipo_cirurgia_form_page.dart';
@@ -31,12 +32,16 @@ class _ConsultaTipoCirurgiaPageState extends State<ConsultaTipoCirurgiaPage> {
   }
 
   Future<void> _loadPermissions() async {
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentTipoCirurgia.canEditByUser(loggedCodusu);
+      _canEdit = _currentTipoCirurgia.canEditByUser(
+        permissions.codusu,
+        isAdmin: permissions.isAdmin,
+        isUserActive: permissions.isActive,
+      );
       _isReady = true;
     });
   }

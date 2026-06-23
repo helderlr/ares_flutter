@@ -1,3 +1,5 @@
+import '../../../core/permissions/user_permissions.dart';
+
 class Medico {
   final int codmed;
   final String nommed;
@@ -20,11 +22,16 @@ class Medico {
   String get crmNumber => crm ?? 'CRM não disponível';
   String get specialty => especialidade ?? 'Especialidade não disponível';
 
-  bool canEditByUser(int? loggedCodusu) {
-    if (loggedCodusu == null || codUsu == null) {
-      return false;
-    }
-    return codUsu == loggedCodusu;
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return UserPermissions(
+      codusu: loggedCodusu,
+      isAdmin: isAdmin,
+      isActive: isUserActive,
+    ).canEditRecord(recordCodusu: codUsu);
   }
 
   factory Medico.fromJson(Map<String, dynamic> json) {

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../../../core/services/paginated_api_helper.dart';
 import '../../../core/services/unauthorized_exception.dart';
 
+import '../../../core/permissions/user_permissions.dart';
+
 class Patient {
   final int codpac;
   final String nompac;
   final String? datnas;
   final String? carteira;
   final int? codUsu;
+  final String? ativo;
 
   const Patient({
     required this.codpac,
@@ -15,6 +18,7 @@ class Patient {
     this.datnas,
     this.carteira,
     this.codUsu,
+    this.ativo,
   });
 
   int get id => codpac;
@@ -22,11 +26,16 @@ class Patient {
   String get birthDate => datnas ?? 'Data não disponível';
   String get planCardNumber => carteira ?? 'Carteira não disponível';
 
-  bool canEditByUser(int? loggedCodusu) {
-    if (loggedCodusu == null || codUsu == null) {
-      return false;
-    }
-    return codUsu == loggedCodusu;
+  bool canEditByUser(
+    int? loggedCodusu, {
+    bool isAdmin = false,
+    bool isUserActive = true,
+  }) {
+    return UserPermissions(
+      codusu: loggedCodusu,
+      isAdmin: isAdmin,
+      isActive: isUserActive,
+    ).canEditRecord(recordCodusu: codUsu, recordAtivo: ativo);
   }
 
   factory Patient.fromJson(Map<String, dynamic> json) {
@@ -48,6 +57,7 @@ class Patient {
           : null,
       carteira: carteira is String && carteira.isNotEmpty ? carteira : null,
       codUsu: _parseCodUsu(json['cod_usu'] ?? json['codusu'] ?? json['COD_USU']),
+      ativo: json['ativo']?.toString(),
     );
   }
 
@@ -65,6 +75,7 @@ class Patient {
       'datnas': datnas,
       'carteira': carteira,
       'cod_usu': codUsu,
+      'ativo': ativo,
     };
   }
 
@@ -74,6 +85,7 @@ class Patient {
     String? datnas,
     String? carteira,
     int? codUsu,
+    String? ativo,
   }) {
     return Patient(
       codpac: codpac ?? this.codpac,
@@ -81,6 +93,7 @@ class Patient {
       datnas: datnas ?? this.datnas,
       carteira: carteira ?? this.carteira,
       codUsu: codUsu ?? this.codUsu,
+      ativo: ativo ?? this.ativo,
     );
   }
 }

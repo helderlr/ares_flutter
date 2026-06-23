@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../models/hospital_model.dart';
 import '../services/hospital_service.dart';
 import 'hospital_form_page.dart';
@@ -47,12 +48,16 @@ class _ConsultaHospitalPageState extends State<ConsultaHospitalPage> {
       Navigator.of(context).pop();
       return;
     }
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentHospital.canEditByUser(loggedCodusu);
+      _canEdit = _currentHospital.canEditByUser(
+        permissions.codusu,
+        isAdmin: permissions.isAdmin,
+        isUserActive: permissions.isActive,
+      );
       _isReady = true;
     });
   }

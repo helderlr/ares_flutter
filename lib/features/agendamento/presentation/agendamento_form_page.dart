@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/app_context.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../../../core/widgets/protected_ui.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../login/services/auth_service.dart';
@@ -97,6 +98,40 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
       _selectedTime = const TimeOfDay(hour: 8, minute: 0);
       _updateDateTimeControllers();
       _loadDefaultVendedor();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _validateAgendaAccess();
+    });
+  }
+
+  Future<void> _validateAgendaAccess() async {
+    if (!_isEditing && !_isCopy) {
+      return;
+    }
+    final AgendaCirurgia source =
+        _isEditing ? widget.agendamento! : widget.copyFrom!;
+    final UserPermissions permissions = await AuthService.getUserPermissions();
+    final AgendaAccess access = source.evaluateAccess(permissions);
+    if (!mounted) {
+      return;
+    }
+    if (_isEditing && !access.canEdit) {
+      final String message = access.situacaoBlockReason ??
+          'Você não tem permissão para editar esta agenda.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+      Navigator.of(context).pop();
+      return;
+    }
+    if (_isCopy && !access.canCopy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Você não tem permissão para copiar esta agenda.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      Navigator.of(context).pop();
     }
   }
 
@@ -1471,6 +1506,51 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   Future<void> _saveAgendamento() async {
     if (!_formKey.currentState!.validate()) {
       return;
+    }
+    final UserPermissions permissions = await AuthService.getUserPermissions();
+    if (!permissions.isActive) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Usuário inativo. Não é possível salvar.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (_isEditing || _isCopy) {
+      final AgendaCirurgia source =
+          _isEditing ? widget.agendamento! : widget.copyFrom!;
+      final AgendaAccess access = source.evaluateAccess(permissions);
+      if (_isEditing && !access.canEdit) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              access.situacaoBlockReason ??
+                  'Você não tem permissão para editar esta agenda.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      if (_isCopy && !access.canCopy) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Você não tem permissão para copiar esta agenda.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     }
 
     // Validar se todas as entidades obrigatórias foram selecionadas

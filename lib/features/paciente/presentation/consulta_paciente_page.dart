@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../services/paciente_service.dart';
 import '../services/paciente_service_paginado.dart';
 import 'paciente_form_page.dart';
@@ -33,12 +34,16 @@ class _ConsultaPacientePageState extends State<ConsultaPacientePage> {
   }
 
   Future<void> _loadPermissions() async {
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentPaciente.canEditByUser(loggedCodusu);
+      _canEdit = _currentPaciente.canEditByUser(
+        permissions.codusu,
+        isAdmin: permissions.isAdmin,
+        isUserActive: permissions.isActive,
+      );
       _isReady = true;
     });
   }

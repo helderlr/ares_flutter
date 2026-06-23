@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
 import '../models/medico_model.dart';
@@ -35,12 +36,16 @@ class _ConsultaMedicoPageState extends State<ConsultaMedicoPage> {
   }
 
   Future<void> _loadPermissions() async {
-    final int? loggedCodusu = await AuthService.getCurrentCodusu();
+    final UserPermissions permissions = await AuthService.getUserPermissions();
     if (!mounted) {
       return;
     }
     setState(() {
-      _canEdit = _currentMedico.canEditByUser(loggedCodusu);
+      _canEdit = _currentMedico.canEditByUser(
+        permissions.codusu,
+        isAdmin: permissions.isAdmin,
+        isUserActive: permissions.isActive,
+      );
       _isReady = true;
     });
   }

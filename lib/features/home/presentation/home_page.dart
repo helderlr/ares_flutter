@@ -14,15 +14,20 @@ import '../../tipo_cirurgia/presentation/tipo_cirurgia_page.dart';
 import '../../agendamento/presentation/agendamento_page.dart';
 import '../../configuracao/presentation/configuracao_page.dart';
 import '../../registro_hora_cirurgia/presentation/registro_hora_cirurgia_page.dart';
+import '../../atendimento/presentation/atendimento_dashboard_page.dart';
+import '../../atendimento/presentation/atendimento_consultas_page.dart';
+import '../../atendimento/presentation/atendimento_relatorios_page.dart';
 
 class _HomeMenuItem {
   final String title;
+  final String? subtitle;
   final IconData icon;
   final Color color;
   final VoidCallback? onTap;
 
   const _HomeMenuItem({
     required this.title,
+    this.subtitle,
     required this.icon,
     required this.color,
     this.onTap,
@@ -80,6 +85,33 @@ class _HomePageState extends State<HomePage> {
 
   List<_HomeMenuItem> _buildAtendimentoItems() {
     return <_HomeMenuItem>[
+      _HomeMenuItem(
+        title: 'Dashboard',
+        subtitle: 'KPIs e gráficos',
+        icon: Icons.dashboard,
+        color: Colors.green,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AtendimentoDashboardPage()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Consultas',
+        subtitle: 'Rankings e resumos',
+        icon: Icons.table_chart,
+        color: Colors.orange,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AtendimentoConsultasPage()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Relatórios',
+        subtitle: 'PDF / Excel / impressão',
+        icon: Icons.description,
+        color: Colors.pink,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AtendimentoRelatoriosPage()),
+        ),
+      ),
       _HomeMenuItem(
         title: 'Pacientes',
         icon: Icons.person,
@@ -225,6 +257,9 @@ class _HomePageState extends State<HomePage> {
 
   List<MenuOption> _buildAtendimentoMenuOptions() {
     return const <MenuOption>[
+      MenuOption(title: 'Dashboard', icon: Icons.dashboard),
+      MenuOption(title: 'Consultas', icon: Icons.table_chart),
+      MenuOption(title: 'Relatórios', icon: Icons.description),
       MenuOption(title: 'Paciente', icon: Icons.person),
       MenuOption(title: 'Médico', icon: Icons.medical_services),
       MenuOption(title: 'Tipo Cirurgia', icon: Icons.healing),
@@ -260,6 +295,24 @@ class _HomePageState extends State<HomePage> {
   void _handleMenuOptionTap(MenuOption option) {
     Navigator.of(context).pop();
     final String title = option.title;
+    if (title == 'Dashboard') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AtendimentoDashboardPage()),
+      );
+      return;
+    }
+    if (title == 'Consultas') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AtendimentoConsultasPage()),
+      );
+      return;
+    }
+    if (title == 'Relatórios') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AtendimentoRelatoriosPage()),
+      );
+      return;
+    }
     if (title == 'Paciente') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const PacientePage()),
@@ -437,7 +490,7 @@ class _HomePageState extends State<HomePage> {
               context: context,
               items: _buildAtendimentoItems(),
               crossAxisCount: 3,
-              childAspectRatio: 0.88,
+              childAspectRatio: 0.78,
             ),
             const SizedBox(height: 28.0),
             _buildSectionTitle(context, 'Faturamento', Icons.payments_outlined),
@@ -506,6 +559,7 @@ class _HomePageState extends State<HomePage> {
         return _buildMenuCard(
           context: context,
           title: item.title,
+          subtitle: item.subtitle,
           icon: item.icon,
           color: item.color,
           onTap: item.onTap,
@@ -517,6 +571,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMenuCard({
     required BuildContext context,
     required String title,
+    String? subtitle,
     required IconData icon,
     required Color color,
     VoidCallback? onTap,
@@ -563,6 +618,20 @@ class _HomePageState extends State<HomePage> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: Colors.grey[600],
+                      height: 1.1,
+                    ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),

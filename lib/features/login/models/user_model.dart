@@ -1,3 +1,5 @@
+import '../../../core/permissions/user_permissions.dart';
+
 class UserModel {
   final String id;
   final String nome;
@@ -6,6 +8,8 @@ class UserModel {
   final String? login;
   final String? codven;
   final int? codusu;
+  final String? admsis;
+  final String? ativo;
 
   const UserModel({
     required this.id,
@@ -15,7 +19,13 @@ class UserModel {
     this.login,
     this.codven,
     this.codusu,
+    this.admsis,
+    this.ativo,
   });
+
+  bool get isAdmin => UserPermissions.parseAdminFlag(admsis);
+
+  bool get isActive => UserPermissions.parseActiveFlag(ativo);
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -30,6 +40,8 @@ class UserModel {
       codusu: json['codusu'] is int
           ? json['codusu'] as int
           : int.tryParse(json['codusu']?.toString() ?? ''),
+      admsis: json['admsis']?.toString(),
+      ativo: json['ativo']?.toString(),
     );
   }
 
@@ -58,6 +70,8 @@ class UserModel {
       if (login != null) 'login': login,
       if (codven != null) 'codven': codven,
       if (codusu != null) 'codusu': codusu,
+      if (admsis != null) 'admsis': admsis,
+      if (ativo != null) 'ativo': ativo,
     };
   }
 
@@ -69,6 +83,8 @@ class UserModel {
     String? login,
     String? codven,
     int? codusu,
+    String? admsis,
+    String? ativo,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -78,6 +94,8 @@ class UserModel {
       login: login ?? this.login,
       codven: codven ?? this.codven,
       codusu: codusu ?? this.codusu,
+      admsis: admsis ?? this.admsis,
+      ativo: ativo ?? this.ativo,
     );
   }
 
