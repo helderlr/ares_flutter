@@ -24,6 +24,46 @@ enum AgendaLadoFilter {
   vazio,
 }
 
+enum AgendaSituacaoFilter {
+  todos,
+  saiu,
+  emAberto,
+  cancelado,
+  retornou,
+}
+
+extension AgendaSituacaoFilterLabels on AgendaSituacaoFilter {
+  String get label {
+    switch (this) {
+      case AgendaSituacaoFilter.todos:
+        return 'Todos';
+      case AgendaSituacaoFilter.saiu:
+        return 'S - Saiu';
+      case AgendaSituacaoFilter.emAberto:
+        return 'A - Em aberto';
+      case AgendaSituacaoFilter.cancelado:
+        return 'C - Cancelado';
+      case AgendaSituacaoFilter.retornou:
+        return 'R - Retornou';
+    }
+  }
+
+  String get apiCode {
+    switch (this) {
+      case AgendaSituacaoFilter.todos:
+        return 'T';
+      case AgendaSituacaoFilter.saiu:
+        return 'S';
+      case AgendaSituacaoFilter.emAberto:
+        return 'A';
+      case AgendaSituacaoFilter.cancelado:
+        return 'C';
+      case AgendaSituacaoFilter.retornou:
+        return 'R';
+    }
+  }
+}
+
 class AgendaListFilters {
   final DateTime? dateFrom;
   final DateTime? dateTo;
@@ -42,6 +82,7 @@ class AgendaListFilters {
   final AgendaTriFilter agendaCopia;
   final AgendaTipmarFilter tipoMarcacao;
   final AgendaLadoFilter lado;
+  final AgendaSituacaoFilter situacaoAgenda;
 
   const AgendaListFilters({
     this.dateFrom,
@@ -61,16 +102,15 @@ class AgendaListFilters {
     this.agendaCopia = AgendaTriFilter.todas,
     this.tipoMarcacao = AgendaTipmarFilter.todas,
     this.lado = AgendaLadoFilter.todas,
+    this.situacaoAgenda = AgendaSituacaoFilter.todos,
   });
 
   static DateTime minAllowedSurgeryDate() {
-    final DateTime now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
+    return DateTime(2010, 1, 1);
   }
 
   static DateTime minAllowedMovementDate() {
-    final DateTime now = DateTime.now();
-    return DateTime(now.year - 5, 1, 1);
+    return DateTime(2010, 1, 1);
   }
 
   static DateTime maxAllowedSurgeryDate() {
@@ -107,7 +147,8 @@ class AgendaListFilters {
       agendaComRelatorio != AgendaTriFilter.todas ||
       agendaCopia != AgendaTriFilter.todas ||
       tipoMarcacao != AgendaTipmarFilter.todas ||
-      lado != AgendaLadoFilter.todas;
+      lado != AgendaLadoFilter.todas ||
+      situacaoAgenda != AgendaSituacaoFilter.todos;
 
   bool get hasActiveFilters =>
       hasUserDateRange || hasTextFilters || hasTriFilters;

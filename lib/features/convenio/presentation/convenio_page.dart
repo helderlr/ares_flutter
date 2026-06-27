@@ -199,7 +199,6 @@ class _ConvenioPageState extends State<ConvenioPage> {
       appBar: AppBar(
         title: const Text('Convênios'),
         centerTitle: true,
-        backgroundColor: AppColors.lightBlue,
         elevation: 0,
         actions: [],
       ),

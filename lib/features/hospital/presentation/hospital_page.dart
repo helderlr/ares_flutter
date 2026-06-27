@@ -200,7 +200,6 @@ class _HospitalPageState extends State<HospitalPage> {
       appBar: AppBar(
         title: const Text('Hospitais'),
         centerTitle: true,
-        backgroundColor: AppColors.lightBlue,
         elevation: 0,
         actions: [],
       ),

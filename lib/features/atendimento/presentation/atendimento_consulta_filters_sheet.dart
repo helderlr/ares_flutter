@@ -5,10 +5,12 @@ import '../models/atendimento_consulta_model.dart';
 
 class AtendimentoConsultaFiltersSheet extends StatefulWidget {
   final AtendimentoConsultaFilters initialFilters;
+  final bool isAdmin;
 
   const AtendimentoConsultaFiltersSheet({
     super.key,
     required this.initialFilters,
+    this.isAdmin = false,
   });
 
   @override
@@ -55,29 +57,62 @@ class _AtendimentoConsultaFiltersSheetState
     super.dispose();
   }
 
+  DateTime get _currentMonthStart {
+    final DateTime now = DateTime.now();
+    return DateTime(now.year, now.month, 1);
+  }
+
+  DateTime get _currentMonthEnd {
+    final DateTime now = DateTime.now();
+    return DateTime(now.year, now.month + 1, 0);
+  }
+
   AtendimentoConsultaFilters _buildFilters() {
     return AtendimentoConsultaFilters(
       dateFrom: _dateFrom,
       dateTo: _dateTo,
       groupBy: _groupBy,
-      medico: _medicoController.text.trim(),
-      hospital: _hospitalController.text.trim(),
-      convenio: _convenioController.text.trim(),
-      tipoCirurgia: _tipoCirurgiaController.text.trim(),
-      vendedor: _vendedorController.text.trim(),
-      instrumentador: _instrumentadorController.text.trim(),
+      medico: _medicoController.text.trim().isEmpty
+          ? null
+          : _medicoController.text.trim(),
+      hospital: _hospitalController.text.trim().isEmpty
+          ? null
+          : _hospitalController.text.trim(),
+      convenio: _convenioController.text.trim().isEmpty
+          ? null
+          : _convenioController.text.trim(),
+      tipoCirurgia: _tipoCirurgiaController.text.trim().isEmpty
+          ? null
+          : _tipoCirurgiaController.text.trim(),
+      vendedor: _vendedorController.text.trim().isEmpty
+          ? null
+          : _vendedorController.text.trim(),
+      instrumentador: _instrumentadorController.text.trim().isEmpty
+          ? null
+          : _instrumentadorController.text.trim(),
     );
   }
 
   Future<void> _pickDate({
     required bool isStart,
   }) async {
+    if (!widget.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Apenas administradores podem filtrar meses anteriores.',
+          ),
+        ),
+      );
+      return;
+    }
     final DateTime initial = isStart ? _dateFrom : _dateTo;
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: _currentMonthEnd,
+      helpText: 'Selecione a data',
     );
     if (picked == null) {
       return;
@@ -98,12 +133,33 @@ class _AtendimentoConsultaFiltersSheetState
   }
 
   void _applyLast30Days() {
-    final AtendimentoConsultaFilters updated =
-        _buildFilters().applyLast30Days();
+    final DateTime end = DateTime.now();
+    final DateTime start = end.subtract(const Duration(days: 29));
+    if (!widget.isAdmin && start.isBefore(_currentMonthStart)) {
+      setState(() {
+        _dateFrom = _currentMonthStart;
+        _dateTo = end.isAfter(_currentMonthEnd) ? _currentMonthEnd : end;
+      });
+      return;
+    }
     setState(() {
-      _dateFrom = updated.dateFrom;
-      _dateTo = updated.dateTo;
+      _dateFrom = start;
+      _dateTo = end;
     });
+  }
+
+  void _clearAllMedicoFilter() {
+    setState(() => _medicoController.clear());
+    Navigator.of(context).pop(
+      _buildFilters().copyWith(clearMedico: true),
+    );
+  }
+
+  void _clearAllHospitalFilter() {
+    setState(() => _hospitalController.clear());
+    Navigator.of(context).pop(
+      _buildFilters().copyWith(clearHospital: true),
+    );
   }
 
   void _clearFilters() {
@@ -169,17 +225,24 @@ class _AtendimentoConsultaFiltersSheetState
                   label: 'Todos médicos',
                   icon: Icons.medical_services,
                   color: Colors.green,
-                  onTap: () => _medicoController.clear(),
+                  onTap: _clearAllMedicoFilter,
                 ),
                 _buildQuickChip(
                   label: 'Todos hospitais',
                   icon: Icons.local_hospital,
                   color: Colors.purple,
-                  onTap: () => _hospitalController.clear(),
+                  onTap: _clearAllHospitalFilter,
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Text(
+              widget.isAdmin
+                  ? 'Administrador: pode filtrar anos anteriores no período.'
+                  : 'Período limitado ao mês atual.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
             const Text(
               'Período',
               style: TextStyle(fontWeight: FontWeight.w600),
@@ -319,7 +382,10 @@ class _AtendimentoConsultaFiltersSheetState
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(
         decoration: InputDecoration(
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
+          suffixIcon: Icon(
+            widget.isAdmin ? Icons.calendar_today : Icons.lock_outline,
+            size: 18,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
           ),

@@ -50,8 +50,6 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Registro Hora Cirurgia'),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),

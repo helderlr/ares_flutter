@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/app_context.dart';
 import 'core/config/api_config.dart';
-import 'core/app_context.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/presentation/home_page.dart';
 import 'features/login/presentation/login_page.dart';
@@ -20,7 +19,7 @@ import 'features/terms/services/terms_check_service.dart';
 
 const Duration _startupTimeout = Duration(seconds: 5);
 const Duration _maxSplashDuration = Duration(seconds: 6);
-const Duration _backgroundLogoutDelay = Duration(seconds: 10);
+const Duration _backgroundLogoutDelay = Duration(minutes: 5);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -333,7 +332,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         onExitApp: _handleExitApp,
       );
     }
-    return LoginPage(onLogin: onLoginSuccess);
+    return LoginPage(
+      onLogin: onLoginSuccess,
+      isDarkTheme: isDarkTheme,
+      onToggleTheme: toggleTheme,
+    );
   }
 
   @override

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/consulta_action_bar.dart';
 import '../../login/services/auth_service.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../services/tipo_cirurgia_service.dart';
@@ -130,17 +130,12 @@ class _ConsultaTipoCirurgiaPageState extends State<ConsultaTipoCirurgiaPage> {
   Widget build(BuildContext context) {
     if (!_isReady) {
       return const Scaffold(
-        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Consulta Tipo Cirurgia'),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(true),
@@ -186,98 +181,33 @@ class _ConsultaTipoCirurgiaPageState extends State<ConsultaTipoCirurgiaPage> {
               ],
             ),
           ),
-          // Rodapé igual à imagem
           if (_canEdit)
-            Container(
-              width: double.infinity,
-              height: 60,
-              color: AppColors.lightBlue,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: _isLoading ? null : () => _deleteTipoCirurgia(),
-                      child: Container(
-                        color: Colors.transparent,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (_isLoading)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            else
-                              const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _isLoading ? 'EXCLUINDO...' : 'EXCLUIR',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
+            ConsultaActionBar(
+              items: <ConsultaActionItem>[
+                ConsultaActionItem(
+                  icon: Icons.delete_outline,
+                  label: _isLoading ? 'Excluindo...' : 'Excluir',
+                  isLoading: _isLoading,
+                  onTap: _deleteTipoCirurgia,
+                ),
+                ConsultaActionItem(
+                  icon: Icons.edit_outlined,
+                  label: 'Editar',
+                  onTap: () async {
+                    final bool? result =
+                        await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (context) => TipoCirurgiaFormPage(
+                          tipoCirurgia: _currentTipoCirurgia,
                         ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final bool? result =
-                            await Navigator.of(context).push<bool>(
-                          MaterialPageRoute(
-                            builder: (context) => TipoCirurgiaFormPage(
-                              tipoCirurgia: _currentTipoCirurgia,
-                            ),
-                          ),
-                        );
-                        if (result == true && mounted) {
-                          Navigator.of(context).pop(true);
-                        }
-                      },
-                      child: Container(
-                        color: Colors.transparent,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'EDITAR',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                    );
+                    if (result == true && mounted) {
+                      Navigator.of(context).pop(true);
+                    }
+                  },
+                ),
+              ],
             ),
         ],
       ),

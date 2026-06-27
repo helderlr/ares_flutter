@@ -197,7 +197,6 @@ class _MedicoPageState extends State<MedicoPage> {
       appBar: AppBar(
         title: const Text('Médicos'),
         centerTitle: true,
-        backgroundColor: AppColors.lightBlue,
         elevation: 0,
         actions: [],
       ),

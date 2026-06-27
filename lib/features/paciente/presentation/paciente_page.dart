@@ -200,7 +200,6 @@ class _PacientePageState extends State<PacientePage> {
       appBar: AppBar(
         title: const Text('Pacientes'),
         centerTitle: true,
-        backgroundColor: AppColors.lightBlue,
         elevation: 0,
         actions: [],
       ),
@@ -211,7 +210,7 @@ class _PacientePageState extends State<PacientePage> {
             padding: const EdgeInsets.all(16),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(

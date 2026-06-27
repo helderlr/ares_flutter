@@ -117,8 +117,6 @@ class _ConvenioFormPageState extends State<ConvenioFormPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Convênio' : 'Novo Convênio'),
-        backgroundColor: AppColors.lightBlue,
-        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: Padding(

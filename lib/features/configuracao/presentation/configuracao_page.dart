@@ -144,14 +144,9 @@ class _ConfiguracaoPageState extends State<ConfiguracaoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Configurações',
-          style: AppTheme.appBarTitleStyle(color: AppColors.lightBlue),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.lightBlue),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),

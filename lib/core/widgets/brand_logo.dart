@@ -95,13 +95,14 @@ class _BrandLogoState extends State<BrandLogo> {
   }
 
   Widget _buildDominaFallbackText() {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
           'DOMINA',
           style: TextStyle(
-            color: Colors.green.shade700,
+            color: isDark ? const Color(0xFF4ADE80) : Colors.green.shade700,
             fontSize: widget.height * 0.22,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.2,
@@ -111,7 +112,7 @@ class _BrandLogoState extends State<BrandLogo> {
         Text(
           'TECNOLOGIA',
           style: TextStyle(
-            color: const Color(0xFF0A2F66),
+            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF0A2F66),
             fontSize: widget.height * 0.12,
             fontWeight: FontWeight.w600,
             letterSpacing: 2,
@@ -167,10 +168,14 @@ class _BrandLogoState extends State<BrandLogo> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color bg = isDark
+        ? Colors.transparent
+        : widget.backgroundColor;
     return Container(
       width: widget.width ?? double.infinity,
       height: widget.height,
-      color: widget.backgroundColor,
+      color: bg,
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: _shouldShowEmpresaLogo

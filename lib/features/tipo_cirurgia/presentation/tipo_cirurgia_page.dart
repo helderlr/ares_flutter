@@ -199,7 +199,6 @@ class _TipoCirurgiaPageState extends State<TipoCirurgiaPage> {
       appBar: AppBar(
         title: const Text('Tipo Cirurgia'),
         centerTitle: true,
-        backgroundColor: AppColors.lightBlue,
         elevation: 0,
         actions: [],
       ),

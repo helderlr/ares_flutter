@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/screen_capture_service.dart';
+import '../../../core/widgets/share_format_sheet.dart';
+import '../../login/services/auth_service.dart';
 import '../models/atendimento_dashboard_model.dart';
 import '../services/atendimento_analytics_service.dart';
+import '../services/atendimento_share_service.dart';
 
 class AtendimentoDashboardPage extends StatefulWidget {
   const AtendimentoDashboardPage({super.key});
@@ -13,15 +19,34 @@ class AtendimentoDashboardPage extends StatefulWidget {
 
 class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
   final AtendimentoAnalyticsService _service = AtendimentoAnalyticsService();
+  final AtendimentoShareService _shareService = AtendimentoShareService();
+  final GlobalKey _shareKey = GlobalKey();
   AtendimentoDashboardData? _data;
   bool _isLoading = true;
+  bool _isSharing = false;
   String? _errorMessage;
   DateTime _referenceMonth = DateTime.now();
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
+    _loadPermissions();
     _loadDashboard();
+  }
+
+  Future<void> _loadPermissions() async {
+    final permissions = await AuthService.getUserPermissions();
+    if (!mounted) {
+      return;
+    }
+    final DateTime now = DateTime.now();
+    setState(() {
+      _isAdmin = permissions.isAdmin;
+      if (!permissions.isAdmin) {
+        _referenceMonth = DateTime(now.year, now.month, 1);
+      }
+    });
   }
 
   Future<void> _loadDashboard() async {
@@ -51,13 +76,27 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
     }
   }
 
+  DateTime get _currentMonthEnd {
+    final DateTime now = DateTime.now();
+    return DateTime(now.year, now.month + 1, 0);
+  }
+
   Future<void> _pickMonth() async {
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Apenas administradores podem consultar meses anteriores.'),
+        ),
+      );
+      return;
+    }
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _referenceMonth,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      firstDate: DateTime(2020, 1, 1),
+      lastDate: _currentMonthEnd,
       helpText: 'Selecione o mês',
+      initialDatePickerMode: DatePickerMode.day,
     );
     if (picked == null) {
       return;
@@ -112,11 +151,22 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
         title: const Text('Dashboard'),
+        actions: [
+          if (!_isLoading && _data != null)
+            IconButton(
+              onPressed: _isSharing ? null : _shareDashboard,
+              icon: _isSharing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.share),
+              tooltip: 'Compartilhar',
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -127,37 +177,71 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildMonthHeader(),
-                        const SizedBox(height: 16),
-                        _buildKpiGrid(),
-                        const SizedBox(height: 20),
-                        _buildChartCard(),
-                        const SizedBox(height: 20),
-                        _buildRankingCard(
-                          title: 'Top médicos',
-                          badge: 'Mês',
-                          badgeColor: AppColors.lightBlue,
-                          icon: Icons.person,
-                          iconColor: AppColors.lightBlue,
-                          items: _data?.topMedicos ?? const [],
+                    child: RepaintBoundary(
+                      key: _shareKey,
+                      child: ColoredBox(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildMonthHeader(),
+                            const SizedBox(height: 12),
+                            _buildKpiGrid(),
+                            const SizedBox(height: 12),
+                            _buildChartCard(),
+                            const SizedBox(height: 12),
+                            _buildRankingsGrid(),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _buildRankingCard(
-                          title: 'Top hospitais',
-                          badge: 'Mês',
-                          badgeColor: Colors.green,
-                          icon: Icons.local_hospital,
-                          iconColor: Colors.green,
-                          items: _data?.topHospitais ?? const [],
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
     );
+  }
+
+  Future<void> _shareDashboard() async {
+    if (_data == null) {
+      return;
+    }
+    final ShareFormat? format = await ShareFormatSheet.show(context);
+    if (format == null || !mounted) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      if (format == ShareFormat.image) {
+        final Uint8List? bytes = await ScreenCaptureService.capturePng(_shareKey);
+        if (bytes == null) {
+          throw Exception('Não foi possível capturar a imagem.');
+        }
+        await ScreenCaptureService.sharePngBytes(
+          bytes: bytes,
+          fileName: 'dashboard_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Dashboard Ares',
+        );
+      } else {
+        final Uint8List pdf = await _shareService.buildDashboardPdf(
+          data: _data!,
+          periodLabel: _formatMonthLabel(_referenceMonth),
+        );
+        await ScreenCaptureService.sharePdfFile(
+          bytes: pdf,
+          fileName: 'dashboard_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Dashboard Ares',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
   }
 
   Widget _buildError() {
@@ -171,7 +255,7 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
               _errorMessage ?? 'Erro ao carregar',
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: _loadDashboard,
               child: const Text('Tentar novamente'),
@@ -183,25 +267,27 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
   }
 
   Widget _buildMonthHeader() {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        const Text(
-          'Visão do mês',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        const Expanded(
+          child: Text(
+            'Visão do mês',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        const Spacer(),
         InkWell(
           onTap: _pickMonth,
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: scheme.surface,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: scheme.outlineVariant),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -211,7 +297,10 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.calendar_today, size: 16),
+                Icon(
+                  _isAdmin ? Icons.calendar_today : Icons.lock_outline,
+                  size: 16,
+                ),
               ],
             ),
           ),
@@ -226,9 +315,9 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.35,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: 1.55,
       children: [
         _buildKpiCard(
           title: 'Cirurgias',
@@ -255,13 +344,51 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
           icon: Icons.account_balance_wallet,
         ),
         _buildKpiCard(
-          title: 'Taxa retorno',
-          value: '${data.taxaRetornoPercent.toStringAsFixed(0)}%',
-          subtitle: 'retornaram',
+          title: 'Médicos',
+          value: '${data.medicos}',
+          subtitle: 'com cirurgias',
+          background: const Color(0xFFE8EAF6),
+          icon: Icons.person,
+        ),
+        _buildKpiCard(
+          title: 'Tipos cirurgia',
+          value: '${data.tiposCirurgia}',
+          subtitle: 'no período',
+          background: const Color(0xFFE0F2F1),
+          icon: Icons.healing,
+        ),
+        _buildKpiCard(
+          title: 'Taxa aprov.',
+          value: '${data.taxaAproveitamentoPercent.toStringAsFixed(0)}%',
+          subtitle: 'realizadas / total',
           background: const Color(0xFFFCE4EC),
-          icon: Icons.sync,
+          icon: Icons.trending_up,
+          onInfoTap: _showTaxaAproveitamentoInfo,
         ),
       ],
+    );
+  }
+
+  void _showTaxaAproveitamentoInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Taxa aproveitamento'),
+          content: const Text(
+            'Taxa de Aproveitamento =\n'
+            '(Cirurgias realizadas ÷ (Realizadas + Canceladas)) × 100\n\n'
+            'Realizadas: agendas não canceladas no período.\n'
+            'Canceladas: agenda_cancelada = S no período.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Ok'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -272,42 +399,73 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
     Color? subtitleColor,
     required Color background,
     required IconData icon,
+    VoidCallback? onInfoTap,
   }) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final Color cardBg = isDark ? scheme.surface : background;
+    final Color titleColor = isDark ? scheme.onSurface : Colors.black87;
+    final Color valueColor = isDark ? scheme.onSurface : Colors.black87;
+    final Color subColor = subtitleColor ??
+        (isDark ? scheme.onSurfaceVariant : Colors.black54);
+    final Color iconColor = isDark ? titleColor : Colors.black54;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: isDark
+            ? Border.all(color: background.withOpacity(0.5))
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    color: titleColor,
+                  ),
                 ),
               ),
-              Icon(icon, color: Colors.black54),
+              if (onInfoTap != null)
+                InkWell(
+                  onTap: onInfoTap,
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: titleColor,
+                  ),
+                ),
+              Icon(icon, color: iconColor, size: 16),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 28,
+            style: TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: valueColor,
             ),
           ),
           if (subtitle != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
-                color: subtitleColor ?? Colors.black54,
+                fontSize: 10,
+                color: subColor,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -318,6 +476,7 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
   }
 
   Widget _buildChartCard() {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     final List<AtendimentoChartMonth> chart =
         _data?.chartMeses ?? const <AtendimentoChartMonth>[];
     final int maxValue = chart.fold<int>(
@@ -340,53 +499,54 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
         ),
         const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: scheme.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Text(
+                'Cirurgias por mês',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Cirurgias por mês',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
                   _buildBadge('Últimos 6 meses', AppColors.lightBlue),
+                  Text(
+                    'Meta: $meta/mês',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        metaAtingida ? Icons.check_circle : Icons.info_outline,
+                        size: 14,
+                        color: metaAtingida ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        metaAtingida ? 'Meta atingida' : 'Abaixo da meta',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: metaAtingida ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Text(
-                    'Meta: $meta cirurgias/mês',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    metaAtingida ? Icons.check_circle : Icons.info_outline,
-                    size: 16,
-                    color: metaAtingida ? Colors.green : Colors.orange,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    metaAtingida ? 'Meta atingida' : 'Abaixo da meta',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: metaAtingida ? Colors.green : Colors.orange,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               SizedBox(
-                height: 160,
+                height: 150,
                 child: chart.isEmpty
                     ? const Center(child: Text('Sem dados no período'))
                     : Row(
@@ -397,15 +557,17 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
                           return Expanded(
                             child: Padding(
                               padding:
-                                  const EdgeInsets.symmetric(horizontal: 4),
+                                  const EdgeInsets.symmetric(horizontal: 2),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  Text(
-                                    '${item.total}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
+                                  FittedBox(
+                                    child: Text(
+                                      '${item.total}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -416,21 +578,23 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
                                         heightFactor: factor < 0.08 && item.total > 0
                                             ? 0.08
                                             : factor,
-                                        widthFactor: 0.55,
+                                        widthFactor: 0.6,
                                         child: Container(
                                           decoration: BoxDecoration(
                                             color: AppColors.lightBlue,
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                                BorderRadius.circular(6),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _formatChartLabel(item.mes),
-                                    style: const TextStyle(fontSize: 11),
+                                  const SizedBox(height: 6),
+                                  FittedBox(
+                                    child: Text(
+                                      _formatChartLabel(item.mes),
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -446,6 +610,50 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
     );
   }
 
+  Widget _buildRankingsGrid() {
+    final AtendimentoDashboardData data = _data!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildRankingCard(
+          title: 'Top médicos',
+          badge: 'Mês',
+          badgeColor: AppColors.lightBlue,
+          icon: Icons.person,
+          iconColor: AppColors.lightBlue,
+          items: data.topMedicos,
+        ),
+        const SizedBox(height: 12),
+        _buildRankingCard(
+          title: 'Top hospitais',
+          badge: 'Mês',
+          badgeColor: Colors.green,
+          icon: Icons.local_hospital,
+          iconColor: Colors.green,
+          items: data.topHospitais,
+        ),
+        const SizedBox(height: 12),
+        _buildRankingCard(
+          title: 'Top tipos cirurgia',
+          badge: 'Mês',
+          badgeColor: Colors.teal,
+          icon: Icons.healing,
+          iconColor: Colors.teal,
+          items: data.topTiposCirurgia,
+        ),
+        const SizedBox(height: 12),
+        _buildRankingCard(
+          title: 'Top convênios',
+          badge: 'Mês',
+          badgeColor: Colors.orange,
+          icon: Icons.account_balance_wallet,
+          iconColor: Colors.orange,
+          items: data.topConvenios,
+        ),
+      ],
+    );
+  }
+
   Widget _buildRankingCard({
     required String title,
     required String badge,
@@ -454,12 +662,13 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
     required Color iconColor,
     required List<AtendimentoRankingItem> items,
   }) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -468,47 +677,63 @@ class _AtendimentoDashboardPageState extends State<AtendimentoDashboardPage> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
+                    color: scheme.onSurface,
                   ),
                 ),
               ),
               _buildBadge(badge, badgeColor),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Text('Sem dados no período'),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Sem dados no período',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
             )
           else
             ...items.map(
               (AtendimentoRankingItem item) => Column(
                 children: [
                   ListTile(
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
                     contentPadding: EdgeInsets.zero,
                     leading: Container(
-                      width: 40,
-                      height: 40,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
                         color: iconColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(icon, color: iconColor, size: 20),
+                      child: Icon(icon, color: iconColor, size: 16),
                     ),
-                    title: Text(item.nome),
+                    title: Text(
+                      item.nome,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
+                    ),
                     trailing: Text(
                       '${item.total}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 14,
+                        color: scheme.onSurface,
                       ),
                     ),
                   ),
                   if (item != items.last)
-                    Divider(color: Colors.grey.shade200, height: 1),
+                    Divider(color: scheme.outlineVariant, height: 1),
                 ],
               ),
             ),

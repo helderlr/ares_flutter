@@ -22,6 +22,7 @@ Future<DateTime?> showProtectedDatePicker({
   required DateTime initialDate,
   required DateTime firstDate,
   required DateTime lastDate,
+  DatePickerMode initialDatePickerMode = DatePickerMode.day,
 }) async {
   AppContext.beginProtectedUi();
   try {
@@ -30,6 +31,8 @@ Future<DateTime?> showProtectedDatePicker({
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: lastDate,
+      initialDatePickerMode: initialDatePickerMode,
+      helpText: 'Selecione a data',
     );
   } finally {
     AppContext.endProtectedUi();

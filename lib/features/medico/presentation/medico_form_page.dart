@@ -148,7 +148,6 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
                     ..._especialidadesParaSelecao.map(
                       (Especialidade item) => ListTile(
                         title: Text(item.nome),
-                        subtitle: Text('Código ${item.codesp}'),
                         trailing: _selectedCodesp == item.codesp
                             ? const Icon(
                                 Icons.check,
@@ -270,11 +269,8 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Médico' : 'Novo Médico'),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -321,7 +317,7 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
                           Icon(Icons.cancel, color: Colors.white, size: 24),
                           SizedBox(width: 8),
                           Text(
-                            'CANCELAR',
+                              'Cancelar',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -355,7 +351,7 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
                                 ),
                                 SizedBox(width: 8),
                                 Text(
-                                  'SALVANDO...',
+                                    'Salvando...',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -374,7 +370,7 @@ class _MedicoFormPageState extends State<MedicoFormPage> {
                                 ),
                                 const SizedBox(width: 8),
                                 const Text(
-                                  'SALVAR',
+                                  'Salvar',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,

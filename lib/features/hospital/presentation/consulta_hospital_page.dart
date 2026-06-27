@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/consulta_action_bar.dart';
 import '../../login/services/auth_service.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../models/hospital_model.dart';
@@ -145,17 +145,12 @@ class _ConsultaHospitalPageState extends State<ConsultaHospitalPage> {
   Widget build(BuildContext context) {
     if (!_isReady) {
       return const Scaffold(
-        backgroundColor: Colors.white,
         body: Center(child: CircularProgressIndicator()),
       );
     }
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Consulta Hospital'),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -253,113 +248,33 @@ class _ConsultaHospitalPageState extends State<ConsultaHospitalPage> {
                 ),
               ),
             ),
-          // Botões de ação
           if (_canEdit)
-            Container(
-              width: double.infinity,
-              height: 60,
-              color: AppColors.lightBlue,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: _isLoading
-                          ? null
-                          : () async {
-                              final bool? result =
-                                  await Navigator.of(context).push<bool>(
-                                MaterialPageRoute(
-                                  builder: (context) => HospitalFormPage(
-                                    hospital: _currentHospital,
-                                  ),
-                                ),
-                              );
-                              if (result == true && mounted) {
-                                Navigator.of(context).pop(true);
-                              }
-                            },
-                      child: Container(
-                        color: Colors.transparent,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'EDITAR',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
+            ConsultaActionBar(
+              items: <ConsultaActionItem>[
+                ConsultaActionItem(
+                  icon: Icons.edit_outlined,
+                  label: 'Editar',
+                  onTap: () async {
+                    final bool? result =
+                        await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (context) => HospitalFormPage(
+                          hospital: _currentHospital,
                         ),
                       ),
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  Expanded(
-                    child: InkWell(
-                      onTap: _isLoading ? null : _deleteHospital,
-                      child: Container(
-                        color: Colors.transparent,
-                        child: _isLoading
-                            ? const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'EXCLUINDO...',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.delete,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'EXCLUIR',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                    );
+                    if (result == true && mounted) {
+                      Navigator.of(context).pop(true);
+                    }
+                  },
+                ),
+                ConsultaActionItem(
+                  icon: Icons.delete_outline,
+                  label: _isLoading ? 'Excluindo...' : 'Excluir',
+                  isLoading: _isLoading,
+                  onTap: _deleteHospital,
+                ),
+              ],
             ),
         ],
       ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 import '../model/menu_option.dart';
 
 class MenuDrawer extends StatelessWidget {
@@ -24,31 +23,32 @@ class MenuDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final Color onSurface = scheme.onSurface;
+    final Color onSurfaceVariant = scheme.onSurfaceVariant;
     return Drawer(
-      backgroundColor: AppColors.white,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: Colors.white),
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const Text(
+                Text(
                   'ARESIA',
                   style: TextStyle(
-                    color: Color(0xFF1E293B),
+                    color: onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 22,
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Usuário',
                   style: TextStyle(
-                    color: Color(0xFF94A3B8),
+                    color: onSurfaceVariant,
                     fontSize: 12,
                   ),
                 ),
@@ -57,8 +57,8 @@ class MenuDrawer extends StatelessWidget {
                   userName,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
+                  style: TextStyle(
+                    color: onSurfaceVariant,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -67,16 +67,19 @@ class MenuDrawer extends StatelessWidget {
             ),
           ),
           _buildExpansionSection(
+            context: context,
             icon: Icons.medical_information_outlined,
             title: 'Atendimento',
             options: atendimento,
           ),
           _buildExpansionSection(
+            context: context,
             icon: Icons.payments_outlined,
             title: 'Faturamento',
             options: faturamento,
           ),
           _buildExpansionSection(
+            context: context,
             icon: Icons.inventory_2_outlined,
             title: 'Estoque',
             options: estoque,
@@ -85,11 +88,11 @@ class MenuDrawer extends StatelessWidget {
           for (final MenuOption option in footerOptions)
             ListTile(
               dense: true,
-              leading: Icon(option.icon, color: Colors.black87, size: 22),
+              leading: Icon(option.icon, color: onSurface, size: 22),
               title: Text(
                 option.title,
-                style: const TextStyle(
-                  color: Colors.black87,
+                style: TextStyle(
+                  color: onSurface,
                   fontSize: 14,
                 ),
               ),
@@ -101,16 +104,18 @@ class MenuDrawer extends StatelessWidget {
   }
 
   Widget _buildExpansionSection({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required List<MenuOption> options,
   }) {
+    final Color onSurface = Theme.of(context).colorScheme.onSurface;
     return ExpansionTile(
-      leading: Icon(icon, color: Colors.black87, size: 22),
+      leading: Icon(icon, color: onSurface, size: 22),
       title: Text(
         title,
-        style: const TextStyle(
-          color: Colors.black87,
+        style: TextStyle(
+          color: onSurface,
           fontSize: 14,
           fontWeight: FontWeight.w600,
         ),
@@ -119,11 +124,11 @@ class MenuDrawer extends StatelessWidget {
           .map(
             (MenuOption option) => ListTile(
               dense: true,
-              leading: Icon(option.icon, color: Colors.black87, size: 20),
+              leading: Icon(option.icon, color: onSurface, size: 20),
               title: Text(
                 option.title,
-                style: const TextStyle(
-                  color: Colors.black87,
+                style: TextStyle(
+                  color: onSurface,
                   fontSize: 13,
                 ),
               ),

@@ -74,6 +74,17 @@ class AgendamentoServicePaginado {
     if (sortBy != null && sortBy != 'date') {
       agendamentos = _applySort(agendamentos, sortBy, sortOrder);
     }
+    if (filters?.situacaoAgenda != null &&
+        filters!.situacaoAgenda != AgendaSituacaoFilter.todos) {
+      agendamentos = agendamentos
+          .where(
+            (AgendaCirurgia item) => matchesSituacaoFilter(
+              item,
+              filters.situacaoAgenda,
+            ),
+          )
+          .toList();
+    }
     return AgendaCirurgiaPaginatedResponse(
       agendamentos: agendamentos,
       pagination: AgendaCirurgiaPaginationInfo.fromJson(decoded.pagination),
@@ -103,7 +114,20 @@ class AgendamentoServicePaginado {
     if (filters.lado != AgendaLadoFilter.todas) {
       extra['lado'] = _ladoFilterToParam(filters.lado);
     }
+    if (filters.situacaoAgenda != AgendaSituacaoFilter.todos) {
+      extra['situacao'] = filters.situacaoAgenda.apiCode;
+    }
     return extra;
+  }
+
+  static bool matchesSituacaoFilter(
+    AgendaCirurgia item,
+    AgendaSituacaoFilter filter,
+  ) {
+    if (filter == AgendaSituacaoFilter.todos) {
+      return true;
+    }
+    return item.situacaoDisplayCode == filter.apiCode;
   }
 
   void _appendTriFilter(
@@ -342,5 +366,31 @@ class AgendamentoServicePaginado {
       searchQuery: searchQuery,
       filters: filters,
     );
+  }
+
+  Future<List<AgendaCirurgia>> fetchAllAgendamentos({
+    AgendaListFilters? filters,
+    String? searchQuery,
+    int pageSize = 200,
+  }) async {
+    final List<AgendaCirurgia> allItems = <AgendaCirurgia>[];
+    int page = 1;
+    while (true) {
+      final AgendaCirurgiaPaginatedResponse response =
+          await fetchAgendamentosPaginated(
+        page: page,
+        pageSize: pageSize,
+        sortBy: 'date',
+        sortOrder: 'asc',
+        searchQuery: searchQuery,
+        filters: filters,
+      );
+      allItems.addAll(response.agendamentos);
+      if (!response.pagination.hasNextPage) {
+        break;
+      }
+      page++;
+    }
+    return allItems;
   }
 }

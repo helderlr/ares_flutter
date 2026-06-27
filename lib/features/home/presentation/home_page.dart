@@ -16,6 +16,8 @@ import '../../configuracao/presentation/configuracao_page.dart';
 import '../../registro_hora_cirurgia/presentation/registro_hora_cirurgia_page.dart';
 import '../../atendimento/presentation/atendimento_dashboard_page.dart';
 import '../../atendimento/presentation/atendimento_consultas_page.dart';
+import '../../atendimento/presentation/atendimento_graficos_page.dart';
+import '../../atendimento/presentation/atendimento_cirurgia_mapa_page.dart';
 import '../../atendimento/presentation/atendimento_relatorios_page.dart';
 
 class _HomeMenuItem {
@@ -101,6 +103,26 @@ class _HomePageState extends State<HomePage> {
         color: Colors.orange,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const AtendimentoConsultasPage()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Gráficos',
+        subtitle: 'Evolução, ranking e pizza',
+        icon: Icons.show_chart,
+        color: Colors.indigo,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AtendimentoGraficosPage()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Cirurgia mapa',
+        subtitle: 'Mapa',
+        icon: Icons.map,
+        color: Colors.teal,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AtendimentoCirurgiaMapaPage(),
+          ),
         ),
       ),
       _HomeMenuItem(
@@ -259,6 +281,8 @@ class _HomePageState extends State<HomePage> {
     return const <MenuOption>[
       MenuOption(title: 'Dashboard', icon: Icons.dashboard),
       MenuOption(title: 'Consultas', icon: Icons.table_chart),
+      MenuOption(title: 'Gráficos', icon: Icons.show_chart),
+      MenuOption(title: 'Cirurgia mapa', icon: Icons.map),
       MenuOption(title: 'Relatórios', icon: Icons.description),
       MenuOption(title: 'Paciente', icon: Icons.person),
       MenuOption(title: 'Médico', icon: Icons.medical_services),
@@ -304,6 +328,20 @@ class _HomePageState extends State<HomePage> {
     if (title == 'Consultas') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const AtendimentoConsultasPage()),
+      );
+      return;
+    }
+    if (title == 'Gráficos') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AtendimentoGraficosPage()),
+      );
+      return;
+    }
+    if (title == 'Cirurgia mapa') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AtendimentoCirurgiaMapaPage(),
+        ),
       );
       return;
     }
@@ -400,6 +438,17 @@ class _HomePageState extends State<HomePage> {
     await widget.onExitApp();
   }
 
+  String _greetingForTime() {
+    final int hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Bom dia,';
+    }
+    if (hour < 18) {
+      return 'Boa tarde,';
+    }
+    return 'Boa noite,';
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<MenuOption> footerOptions = <MenuOption>[
@@ -411,11 +460,9 @@ class _HomePageState extends State<HomePage> {
       ),
       const MenuOption(title: 'Sair', icon: Icons.exit_to_app),
     ];
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
         title: Text(
           _empresaTitle.isNotEmpty ? _empresaTitle : 'ARESIA',
         ),
@@ -425,6 +472,7 @@ class _HomePageState extends State<HomePage> {
               widget.isDarkTheme ? Icons.light_mode : Icons.dark_mode,
             ),
             onPressed: widget.toggleTheme,
+            tooltip: widget.isDarkTheme ? 'Tema claro' : 'Tema escuro',
           ),
         ],
       ),
@@ -446,17 +494,17 @@ class _HomePageState extends State<HomePage> {
               width: double.infinity,
               padding: const EdgeInsets.all(20.0),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: scheme.surface,
                 borderRadius: BorderRadius.circular(12.0),
-                border: Border.all(color: AppColors.lightBlue.withOpacity(0.2)),
+                border: Border.all(color: scheme.primary.withOpacity(0.2)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Bem-vindo',
+                    _greetingForTime(),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.grey[700],
+                          color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                   ),
@@ -475,9 +523,17 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 12.0),
                   Text(
-                    'Gerencie pacientes, médicos, agendas e muito mais.',
+                    'Controle todo o ERP na palma da sua mão.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[700],
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                  const SizedBox(height: 6.0),
+                  Text(
+                    'Atendimento, agenda, estoque, faturamento e financeiro',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -490,7 +546,7 @@ class _HomePageState extends State<HomePage> {
               context: context,
               items: _buildAtendimentoItems(),
               crossAxisCount: 3,
-              childAspectRatio: 0.78,
+              childAspectRatio: 0.72,
             ),
             const SizedBox(height: 28.0),
             _buildSectionTitle(context, 'Faturamento', Icons.payments_outlined),
@@ -521,16 +577,17 @@ class _HomePageState extends State<HomePage> {
     String title,
     IconData icon,
   ) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.lightBlue),
+        Icon(icon, size: 18, color: scheme.primary),
         const SizedBox(width: 8),
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: scheme.onSurface,
                 letterSpacing: 0.1,
               ),
         ),
@@ -576,13 +633,14 @@ class _HomePageState extends State<HomePage> {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: color.withOpacity(0.2)),
           boxShadow: [
@@ -611,7 +669,7 @@ class _HomePageState extends State<HomePage> {
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
+                    color: scheme.onSurface,
                     height: 1.2,
                   ),
               textAlign: TextAlign.center,
@@ -624,7 +682,7 @@ class _HomePageState extends State<HomePage> {
                 subtitle,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontSize: 10,
-                      color: Colors.grey[600],
+                      color: scheme.onSurfaceVariant,
                       height: 1.1,
                     ),
                 textAlign: TextAlign.center,

@@ -232,7 +232,6 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
           _isEditing
@@ -241,9 +240,6 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                   ? 'Copiar Agenda'
                   : 'Nova Agenda',
         ),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -320,7 +316,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'CANCELAR',
+                              'Cancelar',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -358,7 +354,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                                   ),
                                   SizedBox(width: 8),
                                   Text(
-                                    'SALVANDO...',
+                                    'Salvando...',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -377,7 +373,7 @@ class _AgendamentoFormPageState extends State<AgendamentoFormPage> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'SALVAR',
+                                    'Salvar',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../privacy/presentation/privacy_policy_page.dart';
 import '../../terms/presentation/terms_page.dart';
 import '../models/empresa_model.dart';
@@ -11,7 +10,15 @@ import '../widgets/login_logo.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function(String nomeUsuario) onLogin;
-  const LoginPage({super.key, required this.onLogin});
+  final bool isDarkTheme;
+  final VoidCallback onToggleTheme;
+
+  const LoginPage({
+    super.key,
+    required this.onLogin,
+    this.isDarkTheme = false,
+    required this.onToggleTheme,
+  });
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -198,12 +205,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildTermsLabel() {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final Color textColor = credentialsValidated
+        ? scheme.onSurface
+        : scheme.onSurfaceVariant;
+    final Color linkColor = scheme.primary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Checkbox(
           value: acceptedTerms,
-          activeColor: AppColors.lightBlue,
+          activeColor: scheme.primary,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           onChanged: credentialsValidated
@@ -224,18 +236,16 @@ class _LoginPageState extends State<LoginPage> {
                   'Li e aceito os ',
                   style: TextStyle(
                     fontSize: 13,
-                    color: credentialsValidated
-                        ? Colors.black87
-                        : Colors.grey.shade500,
+                    color: textColor,
                   ),
                 ),
                 GestureDetector(
                   onTap: _openTermsPage,
-                  child: const Text(
+                  child: Text(
                     'Termos de Uso',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF0A4D8B),
+                      color: linkColor,
                       decoration: TextDecoration.underline,
                       fontWeight: FontWeight.w600,
                     ),
@@ -245,18 +255,16 @@ class _LoginPageState extends State<LoginPage> {
                   ' e a ',
                   style: TextStyle(
                     fontSize: 13,
-                    color: credentialsValidated
-                        ? Colors.black87
-                        : Colors.grey.shade500,
+                    color: textColor,
                   ),
                 ),
                 GestureDetector(
                   onTap: _openPrivacyPage,
-                  child: const Text(
+                  child: Text(
                     'Política de Privacidade',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF0A4D8B),
+                      color: linkColor,
                       decoration: TextDecoration.underline,
                       fontWeight: FontWeight.w600,
                     ),
@@ -266,9 +274,7 @@ class _LoginPageState extends State<LoginPage> {
                   '.',
                   style: TextStyle(
                     fontSize: 13,
-                    color: credentialsValidated
-                        ? Colors.black87
-                        : Colors.grey.shade500,
+                    color: textColor,
                   ),
                 ),
               ],
@@ -282,9 +288,29 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final double bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final InputDecoration fieldDecoration = InputDecoration(
+      labelStyle: TextStyle(color: scheme.primary),
+      prefixIconColor: scheme.primary,
+      border: const OutlineInputBorder(),
+      filled: true,
+      fillColor: scheme.surface,
+      isDense: true,
+    );
     return Scaffold(
-      backgroundColor: Colors.white,
       resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(
+              widget.isDarkTheme ? Icons.light_mode : Icons.dark_mode,
+            ),
+            onPressed: widget.onToggleTheme,
+            tooltip: widget.isDarkTheme ? 'Tema claro' : 'Tema escuro',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomInset),
@@ -294,10 +320,10 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
+                Text(
                   'Bem-vindo',
                   style: TextStyle(
-                    color: Color(0xFF1E293B),
+                    color: scheme.onSurface,
                     fontWeight: FontWeight.w500,
                     fontSize: 28,
                   ),
@@ -309,13 +335,13 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 12),
                 RichText(
                   textAlign: TextAlign.center,
-                  text: const TextSpan(
+                  text: TextSpan(
                     style: TextStyle(
-                      color: Color(0xFF475569),
+                      color: scheme.onSurfaceVariant,
                       fontSize: 14,
                       height: 1.4,
                     ),
-                    children: [
+                    children: const [
                       TextSpan(text: 'Identifique-se para utilizar '),
                       TextSpan(
                         text: 'DOMINA TECNOLOGIA',
@@ -331,14 +357,9 @@ class _LoginPageState extends State<LoginPage> {
                   autocorrect: false,
                   enabled: !isLoading,
                   onChanged: (_) => _resetAfterCredentialChange(),
-                  decoration: const InputDecoration(
+                  decoration: fieldDecoration.copyWith(
                     labelText: 'Usuário *',
-                    labelStyle: TextStyle(color: AppColors.lightBlue),
-                    prefixIcon: Icon(Icons.email, color: AppColors.lightBlue),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
+                    prefixIcon: const Icon(Icons.email),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -347,21 +368,15 @@ class _LoginPageState extends State<LoginPage> {
                   obscureText: obscurePassword,
                   enabled: !isLoading,
                   onChanged: (_) => _resetAfterCredentialChange(),
-                  decoration: InputDecoration(
+                  decoration: fieldDecoration.copyWith(
                     labelText: 'Senha *',
-                    labelStyle: const TextStyle(color: AppColors.lightBlue),
-                    prefixIcon:
-                        const Icon(Icons.lock, color: AppColors.lightBlue),
-                    border: const OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
+                    prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
                         obscurePassword
                             ? Icons.visibility_off
                             : Icons.visibility,
-                        color: AppColors.lightBlue,
+                        color: scheme.primary,
                       ),
                       onPressed: () {
                         setState(() {
@@ -376,15 +391,9 @@ class _LoginPageState extends State<LoginPage> {
                   DropdownButtonFormField<String>(
                     value: selectedEmpresaId,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: fieldDecoration.copyWith(
                       labelText: 'Empresa',
-                      labelStyle: TextStyle(color: AppColors.lightBlue),
-                      prefixIcon:
-                          Icon(Icons.business, color: AppColors.lightBlue),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      isDense: true,
+                      prefixIcon: const Icon(Icons.business),
                     ),
                     items: pendingLogin?.empresas
                             .map(
@@ -413,7 +422,7 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Checkbox(
                         value: rememberMe,
-                        activeColor: AppColors.lightBlue,
+                        activeColor: scheme.primary,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         onChanged: (bool? value) {
                           setState(() {
@@ -421,7 +430,13 @@ class _LoginPageState extends State<LoginPage> {
                           });
                         },
                       ),
-                      const Text('Lembrar-me', style: TextStyle(fontSize: 13)),
+                      Text(
+                        'Lembrar-me',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurface,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -430,7 +445,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Checkbox(
                       value: securityVerification,
-                      activeColor: AppColors.lightBlue,
+                      activeColor: scheme.primary,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       onChanged: (bool? value) {
                         setState(() {
@@ -438,10 +453,13 @@ class _LoginPageState extends State<LoginPage> {
                         });
                       },
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Verificação de segurança',
-                        style: TextStyle(fontSize: 13),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurface,
+                        ),
                       ),
                     ),
                   ],
@@ -454,8 +472,8 @@ class _LoginPageState extends State<LoginPage> {
                     height: 42,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A4D8B),
-                        foregroundColor: Colors.white,
+                        backgroundColor: scheme.primary,
+                        foregroundColor: scheme.onPrimary,
                         textStyle: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -496,8 +514,8 @@ class _LoginPageState extends State<LoginPage> {
                               statusMessage!.contains('Erro') ||
                               statusMessage!.contains('inválid') ||
                               statusMessage!.contains('incorret')
-                          ? Colors.red.shade700
-                          : Colors.grey.shade800,
+                          ? scheme.error
+                          : scheme.onSurfaceVariant,
                       fontSize: 13,
                     ),
                   ),

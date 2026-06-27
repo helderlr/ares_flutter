@@ -18,12 +18,8 @@ class LegalDocumentPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(title),
-        backgroundColor: const Color(0xFF0A4D8B),
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),

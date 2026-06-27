@@ -71,10 +71,14 @@ class AtendimentoDashboardData {
   final double? cirurgiasVariacaoPercent;
   final int hospitais;
   final int convenios;
-  final double taxaRetornoPercent;
+  final int medicos;
+  final int tiposCirurgia;
+  final double taxaAproveitamentoPercent;
   final List<AtendimentoChartMonth> chartMeses;
   final List<AtendimentoRankingItem> topMedicos;
   final List<AtendimentoRankingItem> topHospitais;
+  final List<AtendimentoRankingItem> topTiposCirurgia;
+  final List<AtendimentoRankingItem> topConvenios;
 
   const AtendimentoDashboardData({
     required this.period,
@@ -82,16 +86,24 @@ class AtendimentoDashboardData {
     required this.cirurgiasVariacaoPercent,
     required this.hospitais,
     required this.convenios,
-    required this.taxaRetornoPercent,
+    required this.medicos,
+    required this.tiposCirurgia,
+    required this.taxaAproveitamentoPercent,
     required this.chartMeses,
     required this.topMedicos,
     required this.topHospitais,
+    required this.topTiposCirurgia,
+    required this.topConvenios,
   });
 
   factory AtendimentoDashboardData.fromJson(Map<String, dynamic> json) {
     final List<dynamic> chartRaw = json['chartMeses'] as List<dynamic>? ?? [];
     final List<dynamic> medRaw = json['topMedicos'] as List<dynamic>? ?? [];
     final List<dynamic> hospRaw = json['topHospitais'] as List<dynamic>? ?? [];
+    final List<dynamic> tipoRaw =
+        json['topTiposCirurgia'] as List<dynamic>? ?? [];
+    final List<dynamic> convTopRaw =
+        json['topConvenios'] as List<dynamic>? ?? [];
     return AtendimentoDashboardData(
       period: AtendimentoDashboardPeriod.fromJson(
         json['period'] as Map<String, dynamic>? ?? {},
@@ -102,8 +114,13 @@ class AtendimentoDashboardData {
           : double.tryParse(json['cirurgiasVariacaoPercent'].toString()),
       hospitais: AtendimentoChartMonth._parseInt(json['hospitais']),
       convenios: AtendimentoChartMonth._parseInt(json['convenios']),
-      taxaRetornoPercent:
-          double.tryParse(json['taxaRetornoPercent']?.toString() ?? '') ?? 0,
+      medicos: AtendimentoChartMonth._parseInt(json['medicos']),
+      tiposCirurgia: AtendimentoChartMonth._parseInt(json['tiposCirurgia']),
+      taxaAproveitamentoPercent: double.tryParse(
+            json['taxaAproveitamentoPercent']?.toString() ?? '',
+          ) ??
+          double.tryParse(json['taxaRetornoPercent']?.toString() ?? '') ??
+          0,
       chartMeses: chartRaw
           .map(
             (dynamic item) => AtendimentoChartMonth.fromJson(
@@ -124,6 +141,22 @@ class AtendimentoDashboardData {
             (dynamic item) => AtendimentoRankingItem.fromJson(
               item as Map<String, dynamic>,
               idKey: 'codcli',
+            ),
+          )
+          .toList(),
+      topTiposCirurgia: tipoRaw
+          .map(
+            (dynamic item) => AtendimentoRankingItem.fromJson(
+              item as Map<String, dynamic>,
+              idKey: 'codcir',
+            ),
+          )
+          .toList(),
+      topConvenios: convTopRaw
+          .map(
+            (dynamic item) => AtendimentoRankingItem.fromJson(
+              item as Map<String, dynamic>,
+              idKey: 'codconv',
             ),
           )
           .toList(),

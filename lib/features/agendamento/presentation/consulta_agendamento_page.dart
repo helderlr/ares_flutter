@@ -1,5 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import '../../../core/services/screen_capture_service.dart';
 import '../../../core/widgets/protected_ui.dart';
+import '../../../core/widgets/share_format_sheet.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../login/services/auth_service.dart';
 import '../../../core/permissions/user_permissions.dart';
@@ -20,8 +26,10 @@ class ConsultaAgendamentoPage extends StatefulWidget {
 
 class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
   final AgendamentoService _service = AgendamentoService();
+  final GlobalKey _shareKey = GlobalKey();
   late AgendaCirurgia _currentAgendamento;
   bool _isLoading = false;
+  bool _isSharing = false;
   AgendaAccess _access = const AgendaAccess(
     canCopy: false,
     canEdit: false,
@@ -154,6 +162,71 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
     });
   }
 
+  Future<void> _shareAgenda() async {
+    final ShareFormat? format = await ShareFormatSheet.show(context);
+    if (format == null || !mounted) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      if (format == ShareFormat.image) {
+        final Uint8List? bytes =
+            await ScreenCaptureService.capturePng(_shareKey);
+        if (bytes == null) {
+          throw Exception('Não foi possível capturar a imagem.');
+        }
+        await ScreenCaptureService.sharePngBytes(
+          bytes: bytes,
+          fileName: 'agenda_${_currentAgendamento.nummov}',
+        );
+      } else {
+        final pw.Document document = pw.Document();
+        document.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: <pw.Widget>[
+                  pw.Text(
+                    'Agenda ${_currentAgendamento.nummov}',
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 12),
+                  pw.Text('Paciente: ${_currentAgendamento.nompac ?? ''}'),
+                  pw.Text('Médico: ${_currentAgendamento.nommed ?? ''}'),
+                  pw.Text('Hospital: ${_currentAgendamento.nomcli ?? ''}'),
+                  pw.Text('Convênio: ${_currentAgendamento.nomconv ?? ''}'),
+                  pw.Text(
+                    'Data: ${_currentAgendamento.dataCirurgia} ${_currentAgendamento.horaCirurgia}',
+                  ),
+                  pw.Text('Situação: ${_currentAgendamento.situacaoDisplayLabel}'),
+                ],
+              );
+            },
+          ),
+        );
+        await ScreenCaptureService.sharePdfFile(
+          bytes: await document.save(),
+          fileName: 'agenda_${_currentAgendamento.nummov}',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,16 +239,38 @@ class _ConsultaAgendamentoPageState extends State<ConsultaAgendamentoPage> {
           onPressed: () => Navigator.of(context).pop(),
           tooltip: 'Voltar',
         ),
+        actions: [
+          IconButton(
+            onPressed: _isSharing ? null : _shareAgenda,
+            icon: _isSharing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.share),
+            tooltip: 'Compartilhar',
+          ),
+        ],
         bottom: _access.hasAnyAction && _isReady ? _buildTopActionBar() : null,
       ),
       body: !_isReady || _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                ..._buildAlertBanners(),
-                ..._buildDetailFields(),
-              ],
+          : RepaintBoundary(
+              key: _shareKey,
+              child: ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  children: [
+                    ..._buildAlertBanners(),
+                    ..._buildDetailFields(),
+                  ],
+                ),
+              ),
             ),
     );
   }

@@ -211,12 +211,8 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Paciente' : 'Novo Paciente'),
-        backgroundColor: AppColors.lightBlue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -268,7 +264,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'CANCELAR',
+                              'Cancelar',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -306,7 +302,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                                   ),
                                   SizedBox(width: 8),
                                   Text(
-                                    'SALVANDO...',
+                                    'Salvando...',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -325,7 +321,7 @@ class _PacienteFormPageState extends State<PacienteFormPage> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    'SALVAR',
+                                    'Salvar',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,

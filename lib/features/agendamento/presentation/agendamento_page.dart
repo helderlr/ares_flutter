@@ -48,6 +48,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   AgendaTriFilter _filtroAgendaCopia = AgendaTriFilter.todas;
   AgendaTipmarFilter _filtroTipoMarcacao = AgendaTipmarFilter.todas;
   AgendaLadoFilter _filtroLado = AgendaLadoFilter.todas;
+  AgendaSituacaoFilter _filtroSituacao = AgendaSituacaoFilter.todos;
   bool _filtrosAtivos = false;
   final TextEditingController _filtroPacienteController =
       TextEditingController();
@@ -80,6 +81,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       agendaCopia: _filtroAgendaCopia,
       tipoMarcacao: _filtroTipoMarcacao,
       lado: _filtroLado,
+      situacaoAgenda: _filtroSituacao,
     );
   }
 
@@ -107,6 +109,20 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  DateTime _clampPickerDate(
+    DateTime value,
+    DateTime minDate,
+    DateTime maxDate,
+  ) {
+    if (value.isBefore(minDate)) {
+      return minDate;
+    }
+    if (value.isAfter(maxDate)) {
+      return maxDate;
+    }
+    return value;
   }
 
   @override
@@ -723,6 +739,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     AgendaTriFilter dialogAgendaCopia = _filtroAgendaCopia;
     AgendaTipmarFilter dialogTipoMarcacao = _filtroTipoMarcacao;
     AgendaLadoFilter dialogLado = _filtroLado;
+    AgendaSituacaoFilter dialogSituacao = _filtroSituacao;
     final DateTime maxDate = AgendaListFilters.maxAllowedSurgeryDate();
     showProtectedDialog<void>(
       context: context,
@@ -772,9 +789,14 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: () async {
+                        final DateTime initialDate = _clampPickerDate(
+                          _filtroDataInicio ?? DateTime.now(),
+                          pickerMinDate,
+                          maxDate,
+                        );
                         final DateTime? date = await showProtectedDatePicker(
                           context: context,
-                          initialDate: _filtroDataInicio ?? pickerMinDate,
+                          initialDate: initialDate,
                           firstDate: pickerMinDate,
                           lastDate: maxDate,
                         );
@@ -793,9 +815,14 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: () async {
+                        final DateTime initialDate = _clampPickerDate(
+                          _filtroDataFim ?? DateTime.now(),
+                          pickerMinDate,
+                          maxDate,
+                        );
                         final DateTime? date = await showProtectedDatePicker(
                           context: context,
-                          initialDate: _filtroDataFim ?? maxDate,
+                          initialDate: initialDate,
                           firstDate: pickerMinDate,
                           lastDate: maxDate,
                         );
@@ -1012,6 +1039,28 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                       },
                     ),
                     const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaSituacaoFilter>(
+                      value: dialogSituacao,
+                      decoration: _buildFilterDecoration('Situação agenda'),
+                      items: AgendaSituacaoFilter.values
+                          .map(
+                            (AgendaSituacaoFilter value) =>
+                                DropdownMenuItem<AgendaSituacaoFilter>(
+                              value: value,
+                              child: Text(value.label),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (AgendaSituacaoFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() {
+                          dialogSituacao = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<AgendaLadoFilter>(
                       value: dialogLado,
                       decoration: _buildFilterDecoration('Lado'),
@@ -1059,6 +1108,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                       dialogAgendaCopia = AgendaTriFilter.todas;
                       dialogTipoMarcacao = AgendaTipmarFilter.todas;
                       dialogLado = AgendaLadoFilter.todas;
+                      dialogSituacao = AgendaSituacaoFilter.todos;
                     });
                     _filtroPacienteController.clear();
                     _filtroNummovController.clear();
@@ -1084,6 +1134,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     _filtroAgendaCopia = dialogAgendaCopia;
                     _filtroTipoMarcacao = dialogTipoMarcacao;
                     _filtroLado = dialogLado;
+                    _filtroSituacao = dialogSituacao;
                     _filtroPaciente =
                         _filtroPacienteController.text.trim().isEmpty
                             ? null
@@ -1168,7 +1219,8 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         _filtroAgendaComRelatorio != AgendaTriFilter.todas ||
         _filtroAgendaCopia != AgendaTriFilter.todas ||
         _filtroTipoMarcacao != AgendaTipmarFilter.todas ||
-        _filtroLado != AgendaLadoFilter.todas;
+        _filtroLado != AgendaLadoFilter.todas ||
+        _filtroSituacao != AgendaSituacaoFilter.todos;
   }
 
   void _clearTextFilters() {
@@ -1187,6 +1239,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     _filtroAgendaCopia = AgendaTriFilter.todas;
     _filtroTipoMarcacao = AgendaTipmarFilter.todas;
     _filtroLado = AgendaLadoFilter.todas;
+    _filtroSituacao = AgendaSituacaoFilter.todos;
     _filtroPacienteController.clear();
     _filtroNummovController.clear();
     _filtroMedicoController.clear();

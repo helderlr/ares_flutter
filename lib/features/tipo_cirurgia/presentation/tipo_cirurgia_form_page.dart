@@ -123,8 +123,6 @@ class _TipoCirurgiaFormPageState extends State<TipoCirurgiaFormPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Tipo Cirurgia' : 'Novo Tipo Cirurgia'),
-        backgroundColor: AppColors.lightBlue,
-        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
       body: Padding(
