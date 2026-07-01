@@ -62,6 +62,7 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
         atendimento: const <MenuOption>[],
         faturamento: const <MenuOption>[],
         estoque: const <MenuOption>[],
+        miscelanea: const <MenuOption>[],
         footerOptions: const <MenuOption>[],
         onOptionTap: (MenuOption option) {},
       ),

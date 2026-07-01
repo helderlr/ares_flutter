@@ -1,5 +1,24 @@
 import '../../../core/permissions/user_permissions.dart';
 
+String? _pickRicherText(String? current, String? incoming) {
+  final String currentText = current?.trim() ?? '';
+  final String incomingText = incoming?.trim() ?? '';
+  if (incomingText.isEmpty) {
+    return currentText.isEmpty ? null : currentText;
+  }
+  if (currentText.isEmpty) {
+    return incomingText;
+  }
+  return incomingText.length >= currentText.length ? incomingText : currentText;
+}
+
+bool _looksLikeMaterialList(String value) {
+  return value.contains('/') ||
+      value.contains('\n') ||
+      value.contains('\r') ||
+      value.length > 80;
+}
+
 enum AgendaVisualStatus {
   cancelada,
   materialSaiu,
@@ -75,6 +94,8 @@ class AgendaCirurgia {
   final String? motivoCancelamento; // Motivo do cancelamento
   final String? numeroPedido; // Número do pedido
   final int? numpedv; // Número pedido venda
+  final String? tipmar; // A=App, W=Web, vazio=Desktop
+  final String? statusAgenda; // status_agenda (Sta no relatório)
 
   const AgendaCirurgia({
     required this.nummov,
@@ -121,7 +142,121 @@ class AgendaCirurgia {
     this.motivoCancelamento,
     this.numeroPedido,
     this.numpedv,
+    this.tipmar,
+    this.statusAgenda,
   });
+
+  String get tipmarDisplay {
+    final String value = (tipmar ?? '').trim().toUpperCase();
+    if (value.isEmpty) {
+      return 'A';
+    }
+    return value.substring(0, 1);
+  }
+
+  String get situacDisplay {
+    final String value = (situac ?? 'A').trim().toUpperCase();
+    if (value.isEmpty) {
+      return 'A';
+    }
+    return value.substring(0, 1);
+  }
+
+  String get statusAgendaDisplay {
+    final String value = (statusAgenda ?? '').trim().toUpperCase();
+    if (value.isEmpty) {
+      return '';
+    }
+    return value.substring(0, 1);
+  }
+
+  String get tipoCirurgiaDisplay {
+    if ((nomcirTipo ?? '').isNotEmpty) {
+      return nomcirTipo!;
+    }
+    if ((nomcir ?? '').isNotEmpty) {
+      return nomcir!;
+    }
+    final String? proc = procir?.trim();
+    if (proc != null &&
+        proc.isNotEmpty &&
+        !_looksLikeMaterialList(proc)) {
+      return proc;
+    }
+    return '';
+  }
+
+  String? get reportMaterialRaw {
+    final String? fromMatcir = matcir?.trim();
+    if (fromMatcir != null && fromMatcir.isNotEmpty) {
+      return fromMatcir;
+    }
+    final String? fromMatneg = matneg?.trim();
+    if (fromMatneg != null && fromMatneg.isNotEmpty) {
+      return fromMatneg;
+    }
+    final String? fromProcir = procir?.trim();
+    if (fromProcir != null &&
+        fromProcir.isNotEmpty &&
+        _looksLikeMaterialList(fromProcir)) {
+      return fromProcir;
+    }
+    return null;
+  }
+
+  bool get hasReportMaterialLines => matcirReportLines.isNotEmpty;
+
+  List<String> get matcirLines {
+    final String raw = reportMaterialRaw?.trim() ?? '';
+    if (raw.isEmpty) {
+      return const <String>[];
+    }
+    final String normalized =
+        raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    final List<String> chunks = normalized.contains('\n')
+        ? normalized.split('\n')
+        : <String>[normalized];
+    final List<String> lines = <String>[];
+    for (final String chunk in chunks) {
+      final String trimmedChunk = chunk.trim();
+      if (trimmedChunk.isEmpty) {
+        continue;
+      }
+      if (trimmedChunk.contains('/')) {
+        lines.addAll(
+          trimmedChunk
+              .split('/')
+              .map((String part) => part.trim())
+              .where((String part) => part.isNotEmpty),
+        );
+      } else {
+        lines.add(trimmedChunk);
+      }
+    }
+    return lines;
+  }
+
+  List<String> get matcirReportLines {
+    return matcirLines
+        .map((String line) {
+          final String trimmed = line.trim();
+          if (trimmed.endsWith('/')) {
+            return trimmed;
+          }
+          return '$trimmed /';
+        })
+        .toList();
+  }
+
+  AgendaCirurgia mergeReportDetail(AgendaCirurgia detail) {
+    return copyWith(
+      matcir: _pickRicherText(matcir, detail.matcir),
+      procir: _pickRicherText(procir, detail.procir),
+      matneg: _pickRicherText(matneg, detail.matneg),
+      nomven: _pickRicherText(nomven, detail.nomven),
+      nomconv: _pickRicherText(nomconv, detail.nomconv),
+    );
+  }
 
   int get id => nummov;
   String get pacienteName => nompac ?? 'Paciente não informado';
@@ -142,7 +277,8 @@ class AgendaCirurgia {
       : 'Hora não definida';
   String get vendedorName => nomven ?? 'Vendedor não informado';
   String get solicitanteName => solicitou ?? 'Solicitante não informado';
-  String get materialCirurgia => matcir ?? 'Material não informado';
+  String get materialCirurgia =>
+      reportMaterialRaw ?? matcir ?? 'Material não informado';
   String get dataSaidaMaterial => datsai != null
       ? '${datsai!.day.toString().padLeft(2, '0')}/${datsai!.month.toString().padLeft(2, '0')}/${datsai!.year}'
       : 'Data não definida';
@@ -335,25 +471,113 @@ class AgendaCirurgia {
     return null;
   }
 
+  static String? _readString(
+    Map<String, dynamic> json,
+    List<String> keys,
+  ) {
+    for (final String key in keys) {
+      final dynamic raw = json[key];
+      if (raw == null) {
+        continue;
+      }
+      if (raw is String) {
+        final String trimmed = raw.trim();
+        if (trimmed.isNotEmpty) {
+          return trimmed;
+        }
+        continue;
+      }
+      if (raw is Map<String, dynamic>) {
+        final String? nested = _readString(
+          raw,
+          <String>[
+            'nome',
+            'name',
+            'nomven',
+            'nomcon',
+            'nomconv',
+            'label',
+            'value',
+            'text',
+            'matcir_v',
+            'matcir',
+          ],
+        );
+        if (nested != null) {
+          return nested;
+        }
+      }
+      final String asText = raw.toString().trim();
+      if (asText.isNotEmpty && asText != 'null') {
+        return asText;
+      }
+    }
+    return null;
+  }
+
   factory AgendaCirurgia.fromJson(Map<String, dynamic> json) {
     return AgendaCirurgia(
       nummov: json['nummov'] ?? json['NUMMOV'] ?? 0,
       codcli: json['codcli'] ?? json['CODCLI'],
-      nomcli: json['nomcli'] ?? json['NOMCLI'] ?? json['cli_nome'],
+      nomcli: _readString(
+            json,
+            <String>['nomcli', 'NOMCLI', 'cli_nome', 'CLI_NOME'],
+          ),
       codmed: json['codmed'] ?? json['CODMED'],
-      nommed: json['nommed'] ?? json['NOMMED'] ?? json['med_nome'],
+      nommed: _readString(
+            json,
+            <String>['nommed', 'NOMMED', 'med_nome', 'MED_NOME'],
+          ),
       codconv: json['codconv'] ?? json['CODCONV'],
-      nomconv: json['nomconv'] ?? json['NOMCONV'],
+      nomconv: _readString(
+            json,
+            <String>[
+              'nomconv',
+              'NOMCONV',
+              'conv_nome',
+              'CONV_NOME',
+              'nomcon',
+              'NOMCON',
+            ],
+          ),
       nomcir: json['nomcir'] ?? json['NOMCIR'],
       datlan: parseApiDate(json['datlan'] ?? json['DATLAN']),
       datcir: parseApiDate(json['datcir'] ?? json['DATCIR']),
       horcir: json['horcir'] ?? json['HORCIR'],
       codven: json['codven'] ?? json['CODVEN'],
-      nomven: json['nomven'] ?? json['NOMVEN'],
+      nomven: _readString(
+            json,
+            <String>[
+              'nomven',
+              'NOMVEN',
+              'ven_nome',
+              'VEN_NOME',
+              'vendedor',
+              'VENDEDOR',
+              'vendedor_nome',
+              'VENDEDOR_NOME',
+            ],
+          ),
       situac: json['situac'] ?? json['SITUAC'],
-      obsage: json['obsage'] ?? json['OBSAGE'],
-      procir: json['procir'] ?? json['PROCIR'],
-      matcir: json['matcir'] ?? json['MATCIR'],
+      obsage: _readString(
+            json,
+            <String>['obsage_v', 'OBSAGE_V', 'obsage', 'OBSAGE'],
+          ),
+      procir: _readString(
+            json,
+            <String>['procir_v', 'PROCIR_V', 'procir', 'PROCIR'],
+          ),
+      matcir: _readString(
+            json,
+            <String>[
+              'matcir_v',
+              'MATCIR_V',
+              'matcir',
+              'MATCIR',
+              'material_cirurgia',
+              'MATERIAL_CIRURGIA',
+            ],
+          ),
       datsai: json['datsai'] != null
           ? DateTime.tryParse(json['datsai']) ??
               (json['DATSAI'] != null
@@ -402,6 +626,9 @@ class AgendaCirurgia {
           json['motivo_cancelamento'] ?? json['MOTIVO_CANCELAMENTO'],
       numeroPedido: json['numero_pedido'] ?? json['NUMERO_PEDIDO'],
       numpedv: _parseInt(json['numpedv'] ?? json['NUMPEDV']),
+      tipmar: json['tipmar']?.toString() ?? json['TIPMAR']?.toString(),
+      statusAgenda: json['status_agenda']?.toString() ??
+          json['STATUS_AGENDA']?.toString(),
     );
   }
 
@@ -431,9 +658,9 @@ class AgendaCirurgia {
       'codven': codven,
       'nomven': nomven,
       'situac': situac,
-      'obsage': obsage,
-      'procir': procir,
-      'matcir': matcir,
+      'obsage_v': obsage,
+      'procir_v': procir,
+      'matcir_v': matcir,
       'datsai': datsai?.toIso8601String(),
       'solicitou': solicitou,
       'recebeu': recebeu,
@@ -460,6 +687,9 @@ class AgendaCirurgia {
       'hora_cancelamento': horaCancelamento,
       'motivo_cancelamento': motivoCancelamento,
       'numero_pedido': numeroPedido,
+      'numpedv': numpedv,
+      'tipmar': tipmar,
+      'status_agenda': statusAgenda,
     };
   }
 
@@ -507,6 +737,9 @@ class AgendaCirurgia {
     String? horaCancelamento,
     String? motivoCancelamento,
     String? numeroPedido,
+    int? numpedv,
+    String? tipmar,
+    String? statusAgenda,
   }) {
     return AgendaCirurgia(
       nummov: nummov ?? this.nummov,
@@ -552,6 +785,9 @@ class AgendaCirurgia {
       horaCancelamento: horaCancelamento ?? this.horaCancelamento,
       motivoCancelamento: motivoCancelamento ?? this.motivoCancelamento,
       numeroPedido: numeroPedido ?? this.numeroPedido,
+      numpedv: numpedv ?? this.numpedv,
+      tipmar: tipmar ?? this.tipmar,
+      statusAgenda: statusAgenda ?? this.statusAgenda,
     );
   }
 }

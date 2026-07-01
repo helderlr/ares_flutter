@@ -37,6 +37,8 @@ class AgendaFilterDialog {
     BuildContext context, {
     AgendaListFilters? initial,
     bool requireDateRange = true,
+    String confirmButtonLabel = 'Aplicar',
+    bool showClearButton = false,
   }) async {
     final TextEditingController pacienteController = TextEditingController(
       text: initial?.pacienteQuery ?? '',
@@ -195,6 +197,178 @@ class AgendaFilterDialog {
                       decoration: _decoration('Tipo de Cirurgia'),
                     ),
                     const SizedBox(height: 12),
+                    TextField(
+                      controller: instrumentadorController,
+                      decoration: _decoration('Instrumentador'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: vendedorController,
+                      decoration: _decoration('Vendedor'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTipmarFilter>(
+                      value: tipoMarcacao,
+                      decoration: _decoration('Tipo Marcação'),
+                      items: const <DropdownMenuItem<AgendaTipmarFilter>>[
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.app,
+                          child: Text('A - App'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.web,
+                          child: Text('W - Web'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.desktop,
+                          child: Text('Vazio - Desktop'),
+                        ),
+                        DropdownMenuItem<AgendaTipmarFilter>(
+                          value: AgendaTipmarFilter.googleAgenda,
+                          child: Text('Google Agenda'),
+                        ),
+                      ],
+                      onChanged: (AgendaTipmarFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => tipoMarcacao = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: agendaCancelada,
+                      decoration: _decoration('Agenda Cancelada'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => agendaCancelada = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: agendaComPedido,
+                      decoration: _decoration('Agenda com Pedido'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todos'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => agendaComPedido = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: agendaComRelatorio,
+                      decoration: _decoration('Agenda com Relatório'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => agendaComRelatorio = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaTriFilter>(
+                      value: agendaCopia,
+                      decoration: _decoration('Agenda Cópia'),
+                      items: const <DropdownMenuItem<AgendaTriFilter>>[
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.sim,
+                          child: Text('Sim'),
+                        ),
+                        DropdownMenuItem<AgendaTriFilter>(
+                          value: AgendaTriFilter.nao,
+                          child: Text('Não'),
+                        ),
+                      ],
+                      onChanged: (AgendaTriFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => agendaCopia = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<AgendaLadoFilter>(
+                      value: lado,
+                      decoration: _decoration('Lado'),
+                      items: const <DropdownMenuItem<AgendaLadoFilter>>[
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.todas,
+                          child: Text('Todas'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.esquerdo,
+                          child: Text('Esquerdo'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.direito,
+                          child: Text('Direito'),
+                        ),
+                        DropdownMenuItem<AgendaLadoFilter>(
+                          value: AgendaLadoFilter.vazio,
+                          child: Text('Vazio'),
+                        ),
+                      ],
+                      onChanged: (AgendaLadoFilter? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setStateDialog(() => lado = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     DropdownButtonFormField<AgendaSituacaoFilter>(
                       value: situacao,
                       decoration: _decoration('Situação agenda'),
@@ -218,6 +392,32 @@ class AgendaFilterDialog {
                 ),
               ),
               actions: <Widget>[
+                if (showClearButton)
+                  TextButton(
+                    onPressed: () {
+                      setStateDialog(() {
+                        dateFrom = null;
+                        dateTo = null;
+                        dateField = AgendaDateFilterField.dataCirurgia;
+                        agendaCancelada = AgendaTriFilter.todas;
+                        agendaComPedido = AgendaTriFilter.todas;
+                        agendaComRelatorio = AgendaTriFilter.todas;
+                        agendaCopia = AgendaTriFilter.todas;
+                        tipoMarcacao = AgendaTipmarFilter.todas;
+                        lado = AgendaLadoFilter.todas;
+                        situacao = AgendaSituacaoFilter.todos;
+                      });
+                      pacienteController.clear();
+                      nummovController.clear();
+                      medicoController.clear();
+                      convenioController.clear();
+                      hospitalController.clear();
+                      tipoCirurgiaController.clear();
+                      instrumentadorController.clear();
+                      vendedorController.clear();
+                    },
+                    child: const Text('Limpar'),
+                  ),
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancelar'),
@@ -255,7 +455,7 @@ class AgendaFilterDialog {
                       ),
                     );
                   },
-                  child: const Text('Gerar'),
+                  child: Text(confirmButtonLabel),
                 ),
               ],
             );

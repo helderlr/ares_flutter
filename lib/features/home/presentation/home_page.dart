@@ -17,8 +17,13 @@ import '../../registro_hora_cirurgia/presentation/registro_hora_cirurgia_page.da
 import '../../atendimento/presentation/atendimento_dashboard_page.dart';
 import '../../atendimento/presentation/atendimento_consultas_page.dart';
 import '../../atendimento/presentation/atendimento_graficos_page.dart';
+import '../../atendimento/presentation/atendimento_cirurgia_diaria_page.dart';
 import '../../atendimento/presentation/atendimento_cirurgia_mapa_page.dart';
 import '../../atendimento/presentation/atendimento_relatorios_page.dart';
+import '../../atendimento/presentation/atendimento_rel_cirurgia_page.dart';
+import '../../atendimento/presentation/atendimento_rota_inteligente_page.dart';
+import '../../atendimento/presentation/atendimento_escala_page.dart';
+import '../../atendimento/presentation/atendimento_agenda_visita_page.dart';
 
 class _HomeMenuItem {
   final String title;
@@ -58,6 +63,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _empresaTitle = '';
+  int _avatarRefreshKey = 0;
 
   @override
   void initState() {
@@ -126,7 +132,60 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       _HomeMenuItem(
-        title: 'Relatórios',
+        title: 'Cirurgia diária',
+        subtitle: 'Calendário',
+        icon: Icons.calendar_month,
+        color: Colors.deepPurple,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AtendimentoCirurgiaDiariaPage(),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Rel Agenda',
+        subtitle: 'Rel Agenda Cirurgia',
+        icon: Icons.assignment_turned_in,
+        color: Colors.brown,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AtendimentoRelCirurgiaPage(),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Rota inteligente',
+        subtitle: 'Rota entre hospitais',
+        icon: Icons.route,
+        color: Colors.blueGrey,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AtendimentoRotaInteligentePage(),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Escala',
+        subtitle: 'Escalas de atendimento',
+        icon: Icons.swap_vert,
+        color: Colors.deepOrange,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AtendimentoEscalaPage()),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Agenda visita',
+        subtitle: 'Visitas agendadas',
+        icon: Icons.event_note,
+        color: Colors.cyan,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AtendimentoAgendaVisitaPage(),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
+        title: 'Relatorio Cirurgia',
         subtitle: 'PDF / Excel / impressão',
         icon: Icons.description,
         color: Colors.pink,
@@ -283,6 +342,11 @@ class _HomePageState extends State<HomePage> {
       MenuOption(title: 'Consultas', icon: Icons.table_chart),
       MenuOption(title: 'Gráficos', icon: Icons.show_chart),
       MenuOption(title: 'Cirurgia mapa', icon: Icons.map),
+      MenuOption(title: 'Cirurgia diária', icon: Icons.calendar_month),
+      MenuOption(title: 'Rel Agenda', icon: Icons.assignment_turned_in),
+      MenuOption(title: 'Rota inteligente', icon: Icons.route),
+      MenuOption(title: 'Escala', icon: Icons.swap_vert),
+      MenuOption(title: 'Agenda visita', icon: Icons.event_note),
       MenuOption(title: 'Relatórios', icon: Icons.description),
       MenuOption(title: 'Paciente', icon: Icons.person),
       MenuOption(title: 'Médico', icon: Icons.medical_services),
@@ -307,6 +371,12 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
+  List<MenuOption> _buildMiscelaneaMenuOptions() {
+    return const <MenuOption>[
+      MenuOption(title: 'Parâmetros', icon: Icons.tune),
+    ];
+  }
+
   List<MenuOption> _buildEstoqueMenuOptions() {
     return const <MenuOption>[
       MenuOption(title: 'Docto Entrada', icon: Icons.input_outlined),
@@ -316,7 +386,7 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
-  void _handleMenuOptionTap(MenuOption option) {
+  Future<void> _handleMenuOptionTap(MenuOption option) async {
     Navigator.of(context).pop();
     final String title = option.title;
     if (title == 'Dashboard') {
@@ -395,10 +465,51 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
-    if (title == 'Miscelânea') {
+    if (title == 'Cirurgia diária') {
       Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AtendimentoCirurgiaDiariaPage(),
+        ),
+      );
+      return;
+    }
+    if (title == 'Rel Agenda' || title == 'Rel. cirurgia') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AtendimentoRelCirurgiaPage(),
+        ),
+      );
+      return;
+    }
+    if (title == 'Rota inteligente') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AtendimentoRotaInteligentePage(),
+        ),
+      );
+      return;
+    }
+    if (title == 'Escala') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AtendimentoEscalaPage()),
+      );
+      return;
+    }
+    if (title == 'Agenda visita') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const AtendimentoAgendaVisitaPage(),
+        ),
+      );
+      return;
+    }
+    if (title == 'Parâmetros') {
+      final bool? changed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => const ConfiguracaoPage()),
       );
+      if (changed == true && mounted) {
+        setState(() => _avatarRefreshKey++);
+      }
       return;
     }
     if (title == 'Termos e Condições') {
@@ -452,7 +563,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final List<MenuOption> footerOptions = <MenuOption>[
-      const MenuOption(title: 'Miscelânea', icon: Icons.apps_outlined),
       const MenuOption(title: 'Termos e Condições', icon: Icons.description),
       const MenuOption(
         title: 'Política de Privacidade',
@@ -482,7 +592,9 @@ class _HomePageState extends State<HomePage> {
         atendimento: _buildAtendimentoMenuOptions(),
         faturamento: _buildFaturamentoMenuOptions(),
         estoque: _buildEstoqueMenuOptions(),
+        miscelanea: _buildMiscelaneaMenuOptions(),
         footerOptions: footerOptions,
+        avatarRefreshKey: _avatarRefreshKey,
         onOptionTap: _handleMenuOptionTap,
       ),
       body: SingleChildScrollView(

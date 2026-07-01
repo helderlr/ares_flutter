@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../core/services/paginated_api_helper.dart';
 import '../../../core/services/unauthorized_exception.dart';
 import '../models/agendamento_model.dart';
 import '../models/agenda_list_filters.dart';
+import 'agendamento_service.dart';
 
 class AgendamentoServicePaginado {
+  final AgendamentoService _detailService = AgendamentoService();
 
   Future<AgendaCirurgiaPaginatedResponse> fetchAgendamentosPaginated({
     required int page,
@@ -392,5 +396,45 @@ class AgendamentoServicePaginado {
       page++;
     }
     return allItems;
+  }
+
+  Future<List<AgendaCirurgia>> enrichAgendasForReport(
+    List<AgendaCirurgia> items,
+  ) async {
+    if (items.isEmpty) {
+      return items;
+    }
+    final List<AgendaCirurgia> enriched = List<AgendaCirurgia>.from(items);
+    const int batchSize = 4;
+    for (int start = 0; start < enriched.length; start += batchSize) {
+      final int end = start + batchSize < enriched.length
+          ? start + batchSize
+          : enriched.length;
+      final List<int> batch = List<int>.generate(
+        end - start,
+        (int offset) => start + offset,
+      );
+      await Future.wait(
+        batch.map((int listIndex) async {
+          final AgendaCirurgia item = enriched[listIndex];
+          try {
+            final AgendaCirurgia? detail =
+                await _detailService.fetchAgendaById(item.nummov);
+            if (detail == null) {
+              debugPrint(
+                'Relatorio: detalhe nao encontrado nummov=${item.nummov}',
+              );
+              return;
+            }
+            enriched[listIndex] = item.mergeReportDetail(detail);
+          } catch (error) {
+            debugPrint(
+              'Relatorio: falha ao carregar detalhe nummov=${item.nummov}: $error',
+            );
+          }
+        }),
+      );
+    }
+    return enriched;
   }
 }

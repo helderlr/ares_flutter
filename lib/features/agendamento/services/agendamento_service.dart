@@ -3,6 +3,7 @@ import 'dart:io';
 import '../../../core/config/api_config.dart';
 import '../../../core/services/http_request_helper.dart';
 import '../../login/services/auth_service.dart';
+import '../models/agendamento_model.dart';
 
 class AgendamentoService {
   Future<void> cancelarAgendamento(
@@ -89,14 +90,14 @@ class AgendamentoService {
       'datcir': _formatDateToApi(datcir),
       'horcir': horcir,
       if (situac != null && situac.isNotEmpty) 'situac': situac,
-      if (obsage != null && obsage.isNotEmpty) 'obsage': obsage,
+      if (obsage != null && obsage.isNotEmpty) 'obsage_v': obsage,
       if (numaut != null && numaut.isNotEmpty) 'numaut': numaut,
       if (lado != null && lado.isNotEmpty) 'lado': lado,
       if (primrev != null && primrev.isNotEmpty) 'primaria_revisao': primrev,
       if (agendaCancelada != null && agendaCancelada.isNotEmpty)
         'agenda_cancelada': agendaCancelada,
       if (solicitou != null && solicitou.isNotEmpty) 'solicitou': solicitou,
-      if (matcir != null && matcir.isNotEmpty) 'matcir': matcir,
+      if (matcir != null && matcir.isNotEmpty) 'matcir_v': matcir,
       if (codven != null && codven > 0) 'codven': codven,
       if (codcir != null && codcir > 0) 'codcir': codcir,
       if (codusu != null && codusu > 0) 'codusu': codusu,
@@ -176,7 +177,7 @@ class AgendamentoService {
       requestBody['situac'] = situac;
     }
     if (obsage != null && obsage.isNotEmpty) {
-      requestBody['obsage'] = obsage;
+      requestBody['obsage_v'] = obsage;
     }
     if (numaut != null && numaut.isNotEmpty) {
       requestBody['numaut'] = numaut;
@@ -197,7 +198,7 @@ class AgendamentoService {
       requestBody['cirurgia_urgencia'] = cirurgiaUrgencia;
     }
     if (matcir != null && matcir.isNotEmpty) {
-      requestBody['matcir'] = matcir;
+      requestBody['matcir_v'] = matcir;
     }
 
     print('   Request body: $requestBody');
@@ -223,6 +224,38 @@ class AgendamentoService {
       throw Exception(
         'Erro ao atualizar agendamento: ${httpResponse.statusCode} - $responseBody',
       );
+    } finally {
+      httpClient.close();
+    }
+  }
+
+  Future<AgendaCirurgia?> fetchAgendaById(int nummov) async {
+    final String empresaId = await AuthService.requireEmpresaId();
+    final Uri uri =
+        Uri.parse('${ApiConfig.apiUrl}/menu/agenda-cirurgia/$nummov').replace(
+      queryParameters: <String, String>{'empresaId': empresaId},
+    );
+    final HttpClient httpClient = HttpRequestHelper.createClient();
+    try {
+      final HttpClientRequest request = await httpClient.getUrl(uri);
+      await HttpRequestHelper.applyJsonHeaders(request);
+      final HttpClientResponse httpResponse = await request.close();
+      final String responseBody =
+          await httpResponse.transform(utf8.decoder).join();
+      await HttpRequestHelper.throwIfUnauthorized(httpResponse.statusCode);
+      if (httpResponse.statusCode == 404) {
+        return null;
+      }
+      if (httpResponse.statusCode != 200) {
+        throw Exception(
+          'Erro ao buscar agendamento: ${httpResponse.statusCode} - $responseBody',
+        );
+      }
+      final dynamic data = HttpRequestHelper.decodeResponse(responseBody);
+      if (data is Map<String, dynamic>) {
+        return AgendaCirurgia.fromJson(data);
+      }
+      return null;
     } finally {
       httpClient.close();
     }

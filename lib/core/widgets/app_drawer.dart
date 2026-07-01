@@ -19,7 +19,7 @@ class AppDrawer extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 const Text(
-                  'Ares Flutter',
+                  'AresIA',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 24,
@@ -58,9 +58,9 @@ class AppDrawer extends StatelessWidget {
               Navigator.pop(context);
               showAboutDialog(
                 context: context,
-                applicationName: 'Ares Flutter',
+                applicationName: 'AresIA',
                 applicationVersion: '1.0.0',
-                applicationIcon: const FlutterLogo(size: 48),
+                applicationIcon: const Icon(Icons.medical_services, size: 48),
                 children: [
                   const Text(
                     'Aplicativo para gerenciamento de agendamentos cirúrgicos.',

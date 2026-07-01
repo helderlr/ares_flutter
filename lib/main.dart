@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/app_context.dart';
 import 'core/config/api_config.dart';
+import 'core/services/google_maps_api_key_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/presentation/home_page.dart';
 import 'features/login/presentation/login_page.dart';
@@ -23,6 +24,7 @@ const Duration _backgroundLogoutDelay = Duration(minutes: 5);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await GoogleMapsApiKeyService.instance.initialize();
   HttpOverrides.global = MyHttpOverrides();
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
@@ -225,6 +227,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Future<void> _runPostLoginStartup() async {
     await AuthService.repairSessionCodusuIfNeeded();
     await AuthService.refreshUserProfileFromServer();
+    unawaited(GoogleMapsApiKeyService.instance.syncFromServer());
     unawaited(AcessoLogService.registerAppAccess());
     _validateSessionInBackground();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -273,6 +276,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       isLoggedIn = true;
       nomeUsuario = nome;
     });
+    unawaited(GoogleMapsApiKeyService.instance.syncFromServer());
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted && AppContext.currentContext != null) {
         TermsCheckService.checkAndShowTerms(

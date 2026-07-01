@@ -1,11 +1,18 @@
 import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../../../core/widgets/protected_ui.dart';
 import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/share_format_sheet.dart';
+import '../../../core/services/screen_capture_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/agendamento_model.dart';
 import '../models/agenda_list_filters.dart';
 import '../services/agendamento_service_paginado.dart';
+import '../services/agenda_lista_pdf_service.dart';
+import '../../login/models/user_model.dart';
+import '../../login/services/auth_service.dart';
 import '../widgets/agenda_status_legend.dart';
 import 'agendamento_form_page.dart';
 import 'consulta_agendamento_page.dart';
@@ -19,6 +26,8 @@ class AgendamentoPage extends StatefulWidget {
 
 class _AgendamentoPageState extends State<AgendamentoPage> {
   final AgendamentoServicePaginado _service = AgendamentoServicePaginado();
+  final AgendaListaPdfService _listaPdfService = AgendaListaPdfService();
+  final GlobalKey _shareKey = GlobalKey();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -50,6 +59,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   AgendaLadoFilter _filtroLado = AgendaLadoFilter.todas;
   AgendaSituacaoFilter _filtroSituacao = AgendaSituacaoFilter.todos;
   bool _filtrosAtivos = false;
+  bool _isSharing = false;
   final TextEditingController _filtroPacienteController =
       TextEditingController();
   final TextEditingController _filtroNummovController = TextEditingController();
@@ -301,6 +311,65 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     }
   }
 
+  Future<void> _shareAgendaList() async {
+    final ShareFormat? format = await ShareFormatSheet.show(context);
+    if (format == null || !mounted) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      if (format == ShareFormat.image) {
+        final Uint8List? bytes =
+            await ScreenCaptureService.capturePng(_shareKey);
+        if (bytes == null) {
+          throw Exception('Não foi possível capturar a imagem.');
+        }
+        await ScreenCaptureService.sharePngBytes(
+          bytes: bytes,
+          fileName: 'agenda_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Agenda Ares',
+        );
+      } else {
+        final AgendaListFilters filters = _buildListFilters();
+        final List<AgendaCirurgia> items = await _service.fetchAllAgendamentos(
+          filters: filters,
+          searchQuery: _currentSearchQuery.isEmpty ? null : _currentSearchQuery,
+        );
+        if (!mounted) {
+          return;
+        }
+        if (items.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nenhum registro para compartilhar.')),
+          );
+          return;
+        }
+        final UserModel? user = await AuthService.getCurrentUser();
+        final String userName = user?.nome ?? 'Usuário';
+        final Uint8List pdf = await _listaPdfService.buildListaPdf(
+          items: items,
+          filters: filters,
+          userName: userName,
+        );
+        await ScreenCaptureService.sharePdfFile(
+          bytes: pdf,
+          fileName: 'agenda_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Agenda Ares',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -319,6 +388,20 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
           tooltip: 'Voltar',
         ),
         actions: [
+          IconButton(
+            onPressed: _isSharing || _isLoading ? null : _shareAgendaList,
+            icon: _isSharing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.share),
+            tooltip: 'Compartilhar',
+          ),
           if (_isFilteringToday())
             IconButton(
               icon: const Icon(Icons.calendar_view_month),
@@ -341,36 +424,42 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar paciente',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25.0),
-                  borderSide: const BorderSide(color: Colors.lightBlue),
+      body: RepaintBoundary(
+        key: _shareKey,
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar paciente',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25.0),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25.0),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25.0),
+                      borderSide: const BorderSide(color: Colors.lightBlue),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    print('🔍 Campo de busca alterado: "$value"');
+                  },
                 ),
               ),
-              onChanged: (value) {
-                print('🔍 Campo de busca alterado: "$value"');
-              },
-            ),
+              Expanded(
+                child: _buildContent(),
+              ),
+            ],
           ),
-          Expanded(
-            child: _buildContent(),
-          ),
-        ],
+        ),
       ),
       bottomNavigationBar: BottomAppBar(
         height: 60,

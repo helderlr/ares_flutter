@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/form_action_bar.dart';
 import '../services/convenio_service.dart';
 import '../models/convenio_model.dart';
 
@@ -118,64 +119,61 @@ class _ConvenioFormPageState extends State<ConvenioFormPage> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Editar Convênio' : 'Novo Convênio'),
         elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildInputField(
-                          'Nome', _nomeController, true, Icons.assignment),
-                      const SizedBox(height: 16),
-                      _buildInputField('CNPJ (opcional)', _cnpjController,
-                          false, Icons.business),
-                      const SizedBox(height: 16),
-                      _buildInputField('Endereço (opcional)',
-                          _enderecoController, false, Icons.location_on),
-                      const SizedBox(height: 16),
-                      _buildInputField('Telefone (opcional)',
-                          _telefoneController, false, Icons.phone),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Botão de salvar
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveConvenio,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.lightBlue,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : Text(
-                        _isEditing ? 'Atualizar' : 'Salvar',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-              ),
-            ],
+        backgroundColor: AppColors.lightBlue,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(),
           ),
+        ],
+      ),
+      body: Form(
+        key: _formKey,
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: <Widget>[
+                  _buildInputField(
+                    'Nome',
+                    _nomeController,
+                    true,
+                    Icons.assignment,
+                  ),
+                  _buildInputField(
+                    'CNPJ (opcional)',
+                    _cnpjController,
+                    false,
+                    Icons.business,
+                  ),
+                  _buildInputField(
+                    'Endereço (opcional)',
+                    _enderecoController,
+                    false,
+                    Icons.location_on,
+                  ),
+                  _buildInputField(
+                    'Telefone (opcional)',
+                    _telefoneController,
+                    false,
+                    Icons.phone,
+                  ),
+                ],
+              ),
+            ),
+            FormActionBar(
+              isLoading: _isLoading,
+              isEditing: _isEditing,
+              onCancel: () => Navigator.of(context).pop(),
+              onSave: _saveConvenio,
+            ),
+          ],
         ),
       ),
     );

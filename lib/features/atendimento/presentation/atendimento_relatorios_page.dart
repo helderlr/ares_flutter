@@ -32,6 +32,7 @@ class _AtendimentoRelatoriosPageState extends State<AtendimentoRelatoriosPage> {
     final AgendaListFilters? filters = await AgendaFilterDialog.show(
       context,
       requireDateRange: true,
+      confirmButtonLabel: 'Gerar',
     );
     if (filters == null || !mounted) {
       return;
@@ -41,10 +42,12 @@ class _AtendimentoRelatoriosPageState extends State<AtendimentoRelatoriosPage> {
       final List<AgendaCirurgia> items = await _agendaService.fetchAllAgendamentos(
         filters: filters,
       );
+      final List<AgendaCirurgia> enriched =
+          await _agendaService.enrichAgendasForReport(items);
       if (!mounted) {
         return;
       }
-      if (items.isEmpty) {
+      if (enriched.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Nenhum registro encontrado.')),
         );
@@ -58,7 +61,7 @@ class _AtendimentoRelatoriosPageState extends State<AtendimentoRelatoriosPage> {
       final UserModel? user = await AuthService.getCurrentUser();
       final empresa = await _empresaService.fetchReportData();
       final Uint8List pdf = await _pdfService.buildAgendaCirurgiaPdf(
-        items: items,
+        items: enriched,
         filters: filters,
         empresa: empresa,
         usuario: user,
@@ -73,7 +76,7 @@ class _AtendimentoRelatoriosPageState extends State<AtendimentoRelatoriosPage> {
           );
           break;
         case ReportExportAction.excel:
-          await AgendaRelatorioExportService.shareExcel(items);
+          await AgendaRelatorioExportService.shareExcel(enriched);
           break;
         case ReportExportAction.share:
           await AgendaRelatorioExportService.sharePdf(

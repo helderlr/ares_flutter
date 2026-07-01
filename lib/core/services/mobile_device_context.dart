@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -126,8 +125,9 @@ class MobileDeviceContext {
 
   static String _generateDeviceId() {
     final Random random = Random.secure();
-    final List<int> bytes = List<int>.generate(16, (_) => random.nextInt(256));
-    return base64Url.encode(bytes).replaceAll('=', '').substring(0, 32);
+    return List<int>.generate(16, (_) => random.nextInt(256))
+        .map((int value) => value.toRadixString(16).padLeft(2, '0'))
+        .join();
   }
 
   static String _buildUserAgent({
@@ -136,7 +136,7 @@ class MobileDeviceContext {
     String? versaoSo,
     String? dispositivo,
   }) {
-    final StringBuffer buffer = StringBuffer('Aresia Flutter Mobile/$appVersao');
+    final StringBuffer buffer = StringBuffer('AresIA Mobile/$appVersao');
     if (sistemaOperacional != null && sistemaOperacional.isNotEmpty) {
       buffer.write(' ($sistemaOperacional');
       if (versaoSo != null && versaoSo.isNotEmpty) {

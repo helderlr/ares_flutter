@@ -15,6 +15,8 @@ import '../../agendamento/services/agendamento_service_paginado.dart';
 import '../../login/services/auth_service.dart';
 import '../models/atendimento_mapa_model.dart';
 import '../services/atendimento_analytics_service.dart';
+import '../utils/map_marker_colors.dart';
+import '../widgets/cirurgia_surgery_details_tile.dart';
 
 class AtendimentoCirurgiaMapaPage extends StatefulWidget {
   const AtendimentoCirurgiaMapaPage({super.key});
@@ -42,6 +44,7 @@ class _AtendimentoCirurgiaMapaPageState
       <int, List<AgendaCirurgia>>{};
   final Map<String, LatLng> _locationByKey = <String, LatLng>{};
   final Map<String, String> _markerIdByKey = <String, String>{};
+  final Map<String, int> _hospitalColorIndex = <String, int>{};
   Set<Marker> _markers = <Marker>{};
   LatLng _cameraTarget = const LatLng(-3.7504, -38.5017);
   String? _selectedHospitalKey;
@@ -76,6 +79,7 @@ class _AtendimentoCirurgiaMapaPageState
       _markers = <Marker>{};
       _locationByKey.clear();
       _markerIdByKey.clear();
+      _hospitalColorIndex.clear();
       _selectedHospitalKey = null;
       _surgeriesByHospital = <int, List<AgendaCirurgia>>{};
     });
@@ -129,15 +133,17 @@ class _AtendimentoCirurgiaMapaPageState
     for (final AtendimentoMapaHospital hospital in _hospitais) {
       final String key = _hospitalKey(hospital);
       final LatLng location = await _resolveLocation(hospital, index: index);
-      index++;
       _locationByKey[key] = location;
       firstLocated ??= location;
-      final String markerId = 'hospital-$key';
+      _hospitalColorIndex[key] = index;
+      final String markerId = 'hospital_${hospital.codcli ?? index}';
       _markerIdByKey[key] = markerId;
       markers.add(
         Marker(
           markerId: MarkerId(markerId),
           position: location,
+          icon: MapMarkerColors.iconForIndex(index),
+          zIndex: index.toDouble(),
           infoWindow: InfoWindow(
             title: hospital.nome,
             snippet: '${hospital.total} cirurgia(s)',
@@ -145,6 +151,7 @@ class _AtendimentoCirurgiaMapaPageState
           onTap: () => _openHospitalDetails(hospital),
         ),
       );
+      index++;
     }
     if (!mounted) {
       return;
@@ -156,48 +163,81 @@ class _AtendimentoCirurgiaMapaPageState
         _cameraTarget = firstLocated;
       }
     });
-    await _fitMapToMarkers();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduleFitMapToMarkers();
+    });
+  }
+
+  void _scheduleFitMapToMarkers() {
+    if (!mounted) {
+      return;
+    }
+    _fitMapToMarkers();
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) {
+        _fitMapToMarkers();
+      }
+    });
   }
 
   Future<void> _fitMapToMarkers() async {
     if (_mapController == null || _markers.isEmpty) {
       return;
     }
-    if (_markers.length == 1) {
+    try {
+      if (_markers.length == 1) {
+        await _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: _markers.first.position, zoom: 14),
+          ),
+        );
+        return;
+      }
+      double minLat = 90;
+      double maxLat = -90;
+      double minLng = 180;
+      double maxLng = -180;
+      for (final Marker marker in _markers) {
+        final double lat = marker.position.latitude;
+        final double lng = marker.position.longitude;
+        if (lat < minLat) {
+          minLat = lat;
+        }
+        if (lat > maxLat) {
+          maxLat = lat;
+        }
+        if (lng < minLng) {
+          minLng = lng;
+        }
+        if (lng > maxLng) {
+          maxLng = lng;
+        }
+      }
+      const double minSpan = 0.008;
+      if ((maxLat - minLat).abs() < minSpan) {
+        final double centerLat = (minLat + maxLat) / 2;
+        minLat = centerLat - minSpan / 2;
+        maxLat = centerLat + minSpan / 2;
+      }
+      if ((maxLng - minLng).abs() < minSpan) {
+        final double centerLng = (minLng + maxLng) / 2;
+        minLng = centerLng - minSpan / 2;
+        maxLng = centerLng + minSpan / 2;
+      }
+      final LatLngBounds bounds = LatLngBounds(
+        southwest: LatLng(minLat, minLng),
+        northeast: LatLng(maxLat, maxLng),
+      );
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 64),
+      );
+    } catch (_) {
       await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
-          CameraPosition(target: _cameraTarget, zoom: 13),
+          CameraPosition(target: _cameraTarget, zoom: 12),
         ),
       );
-      return;
     }
-    double minLat = 90;
-    double maxLat = -90;
-    double minLng = 180;
-    double maxLng = -180;
-    for (final Marker marker in _markers) {
-      final double lat = marker.position.latitude;
-      final double lng = marker.position.longitude;
-      if (lat < minLat) {
-        minLat = lat;
-      }
-      if (lat > maxLat) {
-        maxLat = lat;
-      }
-      if (lng < minLng) {
-        minLng = lng;
-      }
-      if (lng > maxLng) {
-        maxLng = lng;
-      }
-    }
-    final LatLngBounds bounds = LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-    await _mapController!.animateCamera(
-      CameraUpdate.newLatLngBounds(bounds, 48),
-    );
   }
 
   Future<LatLng> _resolveLocation(
@@ -262,7 +302,7 @@ class _AtendimentoCirurgiaMapaPageState
         return null;
       }
       final Location base = locations.first;
-      final double offset = index * 0.004;
+      final double offset = index * 0.015;
       return LatLng(base.latitude + offset, base.longitude + offset);
     } catch (_) {
       return null;
@@ -271,8 +311,8 @@ class _AtendimentoCirurgiaMapaPageState
 
   LatLng _hashFallbackLocation(AtendimentoMapaHospital hospital, int index) {
     final int seed = (hospital.codcli ?? index) * 9973 + index * 37;
-    final double latOffset = (seed % 1000) / 100000;
-    final double lngOffset = ((seed ~/ 1000) % 1000) / 100000;
+    final double latOffset = (seed % 1000) / 80000 + index * 0.012;
+    final double lngOffset = ((seed ~/ 1000) % 1000) / 80000 + index * 0.012;
     return LatLng(
       _cameraTarget.latitude + latOffset,
       _cameraTarget.longitude + lngOffset,
@@ -292,31 +332,13 @@ class _AtendimentoCirurgiaMapaPageState
     return items;
   }
 
-  List<MapEntry<String, List<String>>> _groupNamesByTime(
-    List<AgendaCirurgia> surgeries,
-  ) {
-    final Map<String, List<String>> grouped = <String, List<String>>{};
-    for (final AgendaCirurgia item in surgeries) {
-      final String time = _formatHour(item.horcir ?? '');
-      final List<String> names = grouped.putIfAbsent(time, () => <String>[]);
-      if ((item.nommed ?? '').isNotEmpty && !names.contains(item.nommed!)) {
-        names.add(item.nommed!);
-      }
-      if ((item.nominstru1 ?? '').isNotEmpty &&
-          !names.contains(item.nominstru1!)) {
-        names.add(item.nominstru1!);
-      }
-      if (names.isEmpty && (item.nompac ?? '').isNotEmpty) {
-        names.add(item.nompac!);
-      }
-    }
-    final List<MapEntry<String, List<String>>> entries =
-        grouped.entries.toList()
-          ..sort(
-            (MapEntry<String, List<String>> a, MapEntry<String, List<String>> b) =>
-                a.key.compareTo(b.key),
-          );
-    return entries;
+  List<AgendaCirurgia> _sortedSurgeries(List<AgendaCirurgia> surgeries) {
+    final List<AgendaCirurgia> sorted = List<AgendaCirurgia>.from(surgeries)
+      ..sort(
+        (AgendaCirurgia a, AgendaCirurgia b) =>
+            (a.horcir ?? '').compareTo(b.horcir ?? ''),
+      );
+    return sorted;
   }
 
   Future<void> _openHospitalDetails(AtendimentoMapaHospital hospital) async {
@@ -333,9 +355,12 @@ class _AtendimentoCirurgiaMapaPageState
     if (!mounted) {
       return;
     }
-    final List<AgendaCirurgia> surgeries = _surgeriesFor(hospital);
-    final List<MapEntry<String, List<String>>> timeGroups =
-        _groupNamesByTime(surgeries);
+    final List<AgendaCirurgia> surgeries = _sortedSurgeries(
+      _surgeriesFor(hospital),
+    );
+    final Color markerColor = MapMarkerColors.colorForIndex(
+      _hospitalColorIndex[key] ?? 0,
+    );
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -365,12 +390,34 @@ class _AtendimentoCirurgiaMapaPageState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    hospital.nome,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        width: 14,
+                        height: 14,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: markerColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: markerColor.withOpacity(0.35),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          hospital.nome,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -382,32 +429,14 @@ class _AtendimentoCirurgiaMapaPageState
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: timeGroups.isEmpty
-                        ? const Center(child: Text('Sem detalhes de horários.'))
+                    child: surgeries.isEmpty
+                        ? const Center(child: Text('Sem cirurgias neste hospital.'))
                         : ListView.builder(
                             controller: controller,
-                            itemCount: timeGroups.length,
+                            itemCount: surgeries.length,
                             itemBuilder: (BuildContext context, int index) {
-                              final MapEntry<String, List<String>> group =
-                                  timeGroups[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text(
-                                      group.key,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                    ...group.value.map(
-                                      (String name) => Text(name),
-                                    ),
-                                  ],
-                                ),
+                              return CirurgiaSurgeryDetailsTile(
+                                surgery: surgeries[index],
                               );
                             },
                           ),
@@ -421,13 +450,6 @@ class _AtendimentoCirurgiaMapaPageState
     );
   }
 
-  String _formatHour(String horcir) {
-    final String trimmed = horcir.trim();
-    if (trimmed.length >= 5) {
-      return trimmed.substring(0, 5);
-    }
-    return trimmed;
-  }
 
   Future<void> _shareMapa() async {
     final ShareFormat? format = await ShareFormatSheet.show(context);
@@ -569,7 +591,7 @@ class _AtendimentoCirurgiaMapaPageState
                 ),
               ),
               Expanded(
-                flex: 5,
+                flex: 2,
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _errorMessage != null
@@ -592,16 +614,21 @@ class _AtendimentoCirurgiaMapaPageState
                         : Stack(
                             children: [
                               GoogleMap(
+                                key: ValueKey<int>(_markers.length),
                                 initialCameraPosition: CameraPosition(
                                   target: _cameraTarget,
                                   zoom: 11,
                                 ),
                                 markers: _markers,
                                 myLocationButtonEnabled: false,
+                                compassEnabled: false,
+                                mapToolbarEnabled: false,
                                 onMapCreated:
                                     (GoogleMapController controller) async {
                                   _mapController = controller;
-                                  await _fitMapToMarkers();
+                                  if (_markers.isNotEmpty) {
+                                    _scheduleFitMapToMarkers();
+                                  }
                                 },
                               ),
                               if (_isGeocoding)
@@ -625,7 +652,7 @@ class _AtendimentoCirurgiaMapaPageState
               ),
               if (!_isLoading && _errorMessage == null)
                 Expanded(
-                  flex: 1,
+                  flex: 3,
                   child: _hospitais.isEmpty
                       ? const Center(
                           child: Text('Nenhuma cirurgia neste dia.'),
@@ -641,15 +668,35 @@ class _AtendimentoCirurgiaMapaPageState
                             final String key = _hospitalKey(hospital);
                             final bool isSelected =
                                 _selectedHospitalKey == key;
+                            final Color markerColor = MapMarkerColors.colorForIndex(
+                              _hospitalColorIndex[key] ?? index,
+                            );
+                            final List<AgendaCirurgia> surgeries =
+                                _surgeriesFor(hospital);
                             return ListTile(
                               dense: true,
                               selected: isSelected,
                               selectedTileColor:
                                   AppColors.lightBlue.withOpacity(0.08),
                               onTap: () => _openHospitalDetails(hospital),
-                              leading: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: AppColors.lightBlue,
+                              leading: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: markerColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: <BoxShadow>[
+                                    BoxShadow(
+                                      color: markerColor.withOpacity(0.35),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                                alignment: Alignment.center,
                                 child: Text(
                                   '${hospital.total}',
                                   style: const TextStyle(
@@ -665,13 +712,24 @@ class _AtendimentoCirurgiaMapaPageState
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 13),
                               ),
-                              subtitle: Text(
-                                hospital.fullAddress.isEmpty
-                                    ? 'Endereço não informado'
-                                    : hospital.fullAddress,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 11),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: surgeries
+                                    .take(3)
+                                    .map(
+                                      (AgendaCirurgia surgery) => Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          '${surgery.nompac ?? 'Paciente'} • '
+                                          '${surgery.nomconv ?? 'Convênio'} • '
+                                          '${surgery.nomcirTipo ?? surgery.procir ?? surgery.nomcir ?? 'Cirurgia'}',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
                               trailing:
                                   const Icon(Icons.place_outlined, size: 20),

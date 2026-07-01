@@ -28,7 +28,7 @@ class TermsDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Bem-vindo ao Ares Flutter!',
+                'Bem-vindo ao AresIA!',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,

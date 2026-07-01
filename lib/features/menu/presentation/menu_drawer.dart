@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../model/menu_option.dart';
 
 class MenuDrawer extends StatelessWidget {
   final List<MenuOption> atendimento;
   final List<MenuOption> faturamento;
   final List<MenuOption> estoque;
+  final List<MenuOption> miscelanea;
   final List<MenuOption> footerOptions;
   final String userName;
   final String userPhone;
+  final int avatarRefreshKey;
   final void Function(MenuOption) onOptionTap;
 
   const MenuDrawer({
     required this.atendimento,
     required this.faturamento,
     required this.estoque,
+    required this.miscelanea,
     required this.footerOptions,
     required this.userName,
     required this.userPhone,
+    this.avatarRefreshKey = 0,
     required this.onOptionTap,
     super.key,
   });
@@ -34,34 +39,49 @@ class MenuDrawer extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  'ARESIA',
-                  style: TextStyle(
-                    color: onSurface,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Usuário',
-                  style: TextStyle(
-                    color: onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  userName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: onSurfaceVariant,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    UserAvatar(
+                      key: ValueKey<int>(avatarRefreshKey),
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'ARESIA',
+                            style: TextStyle(
+                              color: onSurface,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Usuário',
+                            style: TextStyle(
+                              color: onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Text(
+                            userName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: onSurfaceVariant,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -83,6 +103,12 @@ class MenuDrawer extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             title: 'Estoque',
             options: estoque,
+          ),
+          _buildExpansionSection(
+            context: context,
+            icon: Icons.apps_outlined,
+            title: 'Miscelânea',
+            options: miscelanea,
           ),
           const Divider(height: 1),
           for (final MenuOption option in footerOptions)

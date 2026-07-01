@@ -103,19 +103,7 @@ class AgendaRelatorioPdfService {
             );
             children.add(_buildTableHeader());
             for (final AgendaCirurgia item in entry.value) {
-              children.add(_buildDataRow(item));
-              final String material = item.matcir?.trim() ?? '';
-              if (material.isNotEmpty) {
-                children.add(
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(left: 8, bottom: 4),
-                    child: pw.Text(
-                      material,
-                      style: const pw.TextStyle(fontSize: 7),
-                    ),
-                  ),
-                );
-              }
+              children.add(_buildRecordBlock(item));
             }
             children.add(pw.SizedBox(height: 6));
           }
@@ -218,7 +206,7 @@ class AgendaRelatorioPdfService {
           'Ordem: 02=Rel Mapa p/Data   Período de $periodFrom a $periodTo',
           style: const pw.TextStyle(fontSize: 8),
         ),
-        pw.Row(
+            pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
@@ -228,9 +216,22 @@ class AgendaRelatorioPdfService {
                 fontWeight: pw.FontWeight.bold,
               ),
             ),
-            pw.Text(
-              'Legenda ● Agenda Cancelada',
-              style: const pw.TextStyle(fontSize: 8),
+            pw.Row(
+              children: [
+                pw.Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColors.red,
+                    shape: pw.BoxShape.circle,
+                  ),
+                ),
+                pw.SizedBox(width: 4),
+                pw.Text(
+                  'Agenda Cancelada',
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+              ],
             ),
           ],
         ),
@@ -293,8 +294,9 @@ class AgendaRelatorioPdfService {
     );
   }
 
-  pw.Widget _buildDataRow(AgendaCirurgia item) {
+  pw.Widget _buildRecordBlock(AgendaCirurgia item) {
     final bool isCancelada = item.isAgendaCancelada;
+    final List<String> materialLines = item.matcirReportLines;
     return pw.Container(
       decoration: pw.BoxDecoration(
         border: const pw.Border(
@@ -303,22 +305,79 @@ class AgendaRelatorioPdfService {
         color: isCancelada ? PdfColors.grey300 : null,
       ),
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(
+      child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: <pw.Widget>[
-          _dataCell('${item.nummov}', 0.07),
-          _dataCell(item.horcir ?? '', 0.07),
-          _dataCell(item.nomcli ?? '', 0.14),
-          _dataCell(item.nommed ?? '', 0.14),
-          _dataCell(item.nomconv ?? '', 0.08),
-          _dataCell(item.nomcirTipo ?? item.nomcir ?? '', 0.1),
-          _dataCell(item.nompac ?? '', 0.14),
-          _dataCell(item.nomven ?? '', 0.1),
-          _dataCell(item.primrev ?? 'A', 0.04),
-          _dataCell(item.situacaoDisplayCode, 0.04),
-          _dataCell(isCancelada ? 'C' : 'A', 0.04),
+          _buildDataRowContent(item),
+          if (materialLines.isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(
+                left: 52,
+                top: 2,
+                bottom: 6,
+                right: 4,
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: materialLines
+                    .map(
+                      (String line) => pw.Text(
+                        line,
+                        style: const pw.TextStyle(fontSize: 7),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  pw.Widget _buildDataRowContent(AgendaCirurgia item) {
+    final bool isCancelada = item.isAgendaCancelada;
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: <pw.Widget>[
+        _dataCell('${item.nummov}', 0.07),
+        _dataCell(item.horcir ?? '', 0.07),
+        _dataCell(item.nomcli ?? '', 0.14),
+        _dataCell(item.nommed ?? '', 0.14),
+        _dataCell(item.nomconv ?? '', 0.08),
+        _dataCell(item.tipoCirurgiaDisplay, 0.1),
+        _dataCell(item.nompac ?? '', 0.14),
+        _dataCell(item.nomven ?? '', 0.1),
+        _dataCell(item.tipmarDisplay, 0.04),
+        _dataCell(item.situacDisplay, 0.04),
+        _staDataCell(
+          isCancelada: isCancelada,
+          status: item.statusAgendaDisplay,
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _staDataCell({
+    required bool isCancelada,
+    required String status,
+  }) {
+    return pw.Expanded(
+      flex: 4,
+      child: isCancelada
+          ? pw.Container(
+              width: 5,
+              height: 5,
+              margin: const pw.EdgeInsets.only(top: 2),
+              decoration: const pw.BoxDecoration(
+                color: PdfColors.red,
+                shape: pw.BoxShape.circle,
+              ),
+            )
+          : pw.Text(
+              status,
+              maxLines: 1,
+              style: const pw.TextStyle(fontSize: 7),
+            ),
     );
   }
 
@@ -340,8 +399,8 @@ class AgendaRelatorioPdfService {
       flex: (flex * 100).round(),
       child: pw.Text(
         text,
-        maxLines: 2,
-        style: const pw.TextStyle(fontSize: 7),
+        maxLines: 1,
+        style: const pw.TextStyle(fontSize: 6.5),
       ),
     );
   }
