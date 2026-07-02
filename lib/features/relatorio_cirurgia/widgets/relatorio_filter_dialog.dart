@@ -1,28 +1,32 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/entity_lookup_picker.dart';
+import '../../../core/widgets/form_section_field.dart';
 import '../../../core/widgets/protected_ui.dart';
 import '../../agendamento/models/agenda_list_filters.dart';
 import '../models/relatorio_list_filters.dart';
 
 class RelatorioFilterDialog {
-  static InputDecoration _decoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      isDense: true,
-    );
-  }
-
-  static InputDecoration _searchDecoration(String label) {
-    return _decoration(label).copyWith(
-      suffixIcon: const Icon(Icons.search),
-    );
-  }
-
   static String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  static Future<void> _applyLookup({
+    required BuildContext context,
+    required Future<EntityLookupSelection?> Function() pick,
+    required TextEditingController controller,
+    required void Function(String? name) setName,
+    required StateSetter setStateDialog,
+  }) async {
+    final EntityLookupSelection? selection = await pick();
+    if (selection == null) {
+      return;
+    }
+    setStateDialog(() {
+      controller.text = selection.code;
+      setName(selection.name);
+    });
   }
 
   static Widget _triDropdown({
@@ -30,9 +34,9 @@ class RelatorioFilterDialog {
     required AgendaTriFilter value,
     required ValueChanged<AgendaTriFilter> onChanged,
   }) {
-    return DropdownButtonFormField<AgendaTriFilter>(
+    return FormSectionDropdown<AgendaTriFilter>(
+      label: label,
       value: value,
-      decoration: _decoration(label),
       items: const <DropdownMenuItem<AgendaTriFilter>>[
         DropdownMenuItem<AgendaTriFilter>(
           value: AgendaTriFilter.todas,
@@ -47,9 +51,9 @@ class RelatorioFilterDialog {
           child: Text('N = Não'),
         ),
       ],
-      onChanged: (AgendaTriFilter? v) {
-        if (v != null) {
-          onChanged(v);
+      onChanged: (AgendaTriFilter? selected) {
+        if (selected != null) {
+          onChanged(selected);
         }
       },
     );
@@ -92,6 +96,10 @@ class RelatorioFilterDialog {
     final TextEditingController tipoController = TextEditingController(
       text: initial?.tipoQuery ?? '',
     );
+    String? hospitalName;
+    String? medicoName;
+    String? convenioName;
+    String? pacienteName;
     DateTime? dateFrom = initial?.dateFrom ?? DateTime.now();
     DateTime? dateTo = initial?.dateTo ?? RelatorioListFilters.maxAllowedDate();
     RelatorioDateFilterField dateField =
@@ -118,40 +126,67 @@ class RelatorioFilterDialog {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      TextField(
+                      FormSectionField(
+                        label: 'Local Cirurgia',
                         controller: hospitalController,
-                        decoration: _searchDecoration('Cod Loc Cir'),
+                        subtitle: hospitalName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickHospital(context),
+                          controller: hospitalController,
+                          setName: (String? name) => hospitalName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Medico',
                         controller: medicoController,
-                        decoration: _searchDecoration('Cod Medico'),
+                        subtitle: medicoName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickMedico(context),
+                          controller: medicoController,
+                          setName: (String? name) => medicoName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Convenio',
                         controller: convenioController,
-                        decoration: _searchDecoration('Cod Convenio'),
+                        subtitle: convenioName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickConvenio(context),
+                          controller: convenioController,
+                          setName: (String? name) => convenioName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Paciente',
                         controller: pacienteController,
-                        decoration: _searchDecoration('Cod Paciente'),
+                        subtitle: pacienteName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickPaciente(context),
+                          controller: pacienteController,
+                          setName: (String? name) => pacienteName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
-                      const SizedBox(height: 10),
                       _triDropdown(
                         label: 'Dar Visto',
                         value: darVisto,
-                        onChanged: (AgendaTriFilter v) =>
-                            setStateDialog(() => darVisto = v),
+                        onChanged: (AgendaTriFilter value) =>
+                            setStateDialog(() => darVisto = value),
                       ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<RelatorioDateFilterField>(
+                      FormSectionDropdown<RelatorioDateFilterField>(
+                        label: 'Tipo Periodo',
                         value: dateField,
-                        decoration: _decoration('Tipo Periodo'),
                         items: const <DropdownMenuItem<RelatorioDateFilterField>>[
                           DropdownMenuItem<RelatorioDateFilterField>(
                             value: RelatorioDateFilterField.dataCirurgia,
@@ -162,21 +197,19 @@ class RelatorioFilterDialog {
                             child: Text('2 = Data Emissao'),
                           ),
                         ],
-                        onChanged: (RelatorioDateFilterField? v) {
-                          if (v != null) {
-                            setStateDialog(() => dateField = v);
+                        onChanged: (RelatorioDateFilterField? value) {
+                          if (value != null) {
+                            setStateDialog(() => dateField = value);
                           }
                         },
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Digitado por',
                         controller: digitadoController,
-                        decoration: _searchDecoration('Digitado por'),
                       ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<RelatorioLadoFilter>(
+                      FormSectionDropdown<RelatorioLadoFilter>(
+                        label: 'Lado',
                         value: lado,
-                        decoration: _decoration('Lado'),
                         items: const <DropdownMenuItem<RelatorioLadoFilter>>[
                           DropdownMenuItem<RelatorioLadoFilter>(
                             value: RelatorioLadoFilter.todos,
@@ -195,24 +228,21 @@ class RelatorioFilterDialog {
                             child: Text('A = Ambos'),
                           ),
                         ],
-                        onChanged: (RelatorioLadoFilter? v) {
-                          if (v != null) {
-                            setStateDialog(() => lado = v);
+                        onChanged: (RelatorioLadoFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => lado = value);
                           }
                         },
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Tipo',
                         controller: tipoController,
-                        decoration: _searchDecoration('Tipo'),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Circulante',
                         controller: codcirController,
-                        decoration: _searchDecoration('Cod Circulante'),
                         keyboardType: TextInputType.number,
                       ),
-                      const SizedBox(height: 10),
                       OutlinedButton(
                         onPressed: () async {
                           final DateTime? picked = await showProtectedDatePicker(
@@ -250,16 +280,15 @@ class RelatorioFilterDialog {
                               : 'Data Termino',
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      const SizedBox(height: 12),
+                      FormSectionField(
+                        label: 'No Rel',
                         controller: numrelController,
-                        decoration: _decoration('No Rel'),
                         keyboardType: TextInputType.number,
                       ),
-                      const SizedBox(height: 10),
-                      DropdownButtonFormField<RelatorioSexoFilter>(
+                      FormSectionDropdown<RelatorioSexoFilter>(
+                        label: 'Sexo',
                         value: sexo,
-                        decoration: _decoration('Sexo'),
                         items: const <DropdownMenuItem<RelatorioSexoFilter>>[
                           DropdownMenuItem<RelatorioSexoFilter>(
                             value: RelatorioSexoFilter.todos,
@@ -274,48 +303,42 @@ class RelatorioFilterDialog {
                             child: Text('F = Feminino'),
                           ),
                         ],
-                        onChanged: (RelatorioSexoFilter? v) {
-                          if (v != null) {
-                            setStateDialog(() => sexo = v);
+                        onChanged: (RelatorioSexoFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => sexo = value);
                           }
                         },
                       ),
-                      const SizedBox(height: 10),
                       _triDropdown(
                         label: 'Rel Problema',
                         value: relProblema,
-                        onChanged: (AgendaTriFilter v) =>
-                            setStateDialog(() => relProblema = v),
+                        onChanged: (AgendaTriFilter value) =>
+                            setStateDialog(() => relProblema = value),
                       ),
-                      const SizedBox(height: 10),
                       _triDropdown(
                         label: 'Rel Com Agenda',
                         value: relComAgenda,
-                        onChanged: (AgendaTriFilter v) =>
-                            setStateDialog(() => relComAgenda = v),
+                        onChanged: (AgendaTriFilter value) =>
+                            setStateDialog(() => relComAgenda = value),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Instrumentador',
                         controller: codinsController,
-                        decoration: _searchDecoration('Cod Inst'),
                         keyboardType: TextInputType.number,
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'Produto',
                         controller: produtoController,
-                        decoration: _searchDecoration('Cod Produto'),
                       ),
-                      const SizedBox(height: 10),
                       _triDropdown(
                         label: 'Rel Com Pedido',
                         value: relComPedido,
-                        onChanged: (AgendaTriFilter v) =>
-                            setStateDialog(() => relComPedido = v),
+                        onChanged: (AgendaTriFilter value) =>
+                            setStateDialog(() => relComPedido = value),
                       ),
-                      const SizedBox(height: 10),
-                      TextField(
+                      FormSectionField(
+                        label: 'No Agenda',
                         controller: nagecirController,
-                        decoration: _decoration('No Agenda'),
                         keyboardType: TextInputType.number,
                       ),
                     ],

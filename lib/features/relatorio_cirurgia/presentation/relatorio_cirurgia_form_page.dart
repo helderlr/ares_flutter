@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../convenio/services/convenio_service_paginado.dart';
-import '../../hospital/services/hospital_service_paginado.dart';
-import '../../medico/services/medico_service_paginado.dart';
-import '../../paciente/services/paciente_service.dart';
-import '../../tipo_cirurgia/services/tipo_cirurgia_service_paginado.dart';
+import '../../../core/widgets/entity_lookup_picker.dart';
+import '../../../core/widgets/form_section_field.dart';
 import '../models/relatorio_cirurgia_model.dart';
 import '../services/relatorio_cirurgia_service.dart';
 
@@ -315,131 +312,84 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     }
   }
 
-  Future<void> _pickPaciente() async {
-    final PacienteService service = PacienteService();
-    final dynamic result = await showSearch<dynamic>(
-      context: context,
-      delegate: _SimpleSearchDelegate(
-        title: 'Paciente',
-        loadItems: (String query) async {
-          final list = await service.searchPacientes(query);
-          return list;
-        },
-        labelOf: (dynamic item) => '${item['codpac']} - ${item['nompac']}',
-      ),
-    );
-    if (result == null) {
+  Future<void> _applyLookupSelection({
+    required EntityLookupSelection? selection,
+    required void Function(int? code, String? name) apply,
+    required TextEditingController controller,
+  }) async {
+    if (selection == null) {
       return;
     }
     setState(() {
-      _codpac = int.tryParse('${result['codpac']}');
-      _pacNome = result['nompac']?.toString();
-      _codpacController.text = _codpac?.toString() ?? '';
+      final int? code = int.tryParse(selection.code);
+      apply(code, selection.name);
+      controller.text = selection.code;
     });
+  }
+
+  Future<void> _pickPaciente() async {
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickPaciente(context);
+    await _applyLookupSelection(
+      selection: selection,
+      controller: _codpacController,
+      apply: (int? code, String? name) {
+        _codpac = code;
+        _pacNome = name;
+      },
+    );
   }
 
   Future<void> _pickMedico() async {
-    final MedicoServicePaginado service = MedicoServicePaginado();
-    final dynamic result = await showSearch<dynamic>(
-      context: context,
-      delegate: _SimpleSearchDelegate(
-        title: 'Médico',
-        loadItems: (String query) async {
-          final response = await service.fetchMedicosPaginated(
-            page: 1,
-            searchQuery: query,
-          );
-          return response.medicos;
-        },
-        labelOf: (dynamic item) => '${item.codmed} - ${item.nommed}',
-      ),
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickMedico(context);
+    await _applyLookupSelection(
+      selection: selection,
+      controller: _codmedController,
+      apply: (int? code, String? name) {
+        _codmed = code;
+        _medNome = name;
+      },
     );
-    if (result == null) {
-      return;
-    }
-    setState(() {
-      _codmed = result.codmed as int?;
-      _medNome = result.nommed as String?;
-      _codmedController.text = _codmed?.toString() ?? '';
-    });
   }
 
   Future<void> _pickHospital() async {
-    final HospitalServicePaginado service = HospitalServicePaginado();
-    final dynamic result = await showSearch<dynamic>(
-      context: context,
-      delegate: _SimpleSearchDelegate(
-        title: 'Local cirurgia',
-        loadItems: (String query) async {
-          final response = await service.fetchHospitaisPaginated(
-            page: 1,
-            searchQuery: query,
-          );
-          return response.hospitais;
-        },
-        labelOf: (dynamic item) => '${item.codcli} - ${item.nomcli}',
-      ),
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickHospital(context);
+    await _applyLookupSelection(
+      selection: selection,
+      controller: _codcliController,
+      apply: (int? code, String? name) {
+        _codcli = code;
+        _cliNome = name;
+      },
     );
-    if (result == null) {
-      return;
-    }
-    setState(() {
-      _codcli = result.codcli as int?;
-      _cliNome = result.nomcli as String?;
-      _codcliController.text = _codcli?.toString() ?? '';
-    });
   }
 
   Future<void> _pickConvenio() async {
-    final ConvenioServicePaginado service = ConvenioServicePaginado();
-    final dynamic result = await showSearch<dynamic>(
-      context: context,
-      delegate: _SimpleSearchDelegate(
-        title: 'Convênio',
-        loadItems: (String query) async {
-          final response = await service.fetchConveniosPaginated(
-            page: 1,
-            searchQuery: query,
-          );
-          return response.convenios;
-        },
-        labelOf: (dynamic item) => '${item.codconv} - ${item.nomconv}',
-      ),
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickConvenio(context);
+    await _applyLookupSelection(
+      selection: selection,
+      controller: _codconvController,
+      apply: (int? code, String? name) {
+        _codconv = code;
+        _convNome = name;
+      },
     );
-    if (result == null) {
-      return;
-    }
-    setState(() {
-      _codconv = result.codconv as int?;
-      _convNome = result.nomconv as String?;
-      _codconvController.text = _codconv?.toString() ?? '';
-    });
   }
 
   Future<void> _pickTipoCirurgia() async {
-    final TipoCirurgiaServicePaginado service = TipoCirurgiaServicePaginado();
-    final dynamic result = await showSearch<dynamic>(
-      context: context,
-      delegate: _SimpleSearchDelegate(
-        title: 'Tipo cirurgia',
-        loadItems: (String query) async {
-          final response = await service.fetchTiposCirurgiaPaginated(
-            page: 1,
-            searchQuery: query,
-          );
-          return response.tiposCirurgia;
-        },
-        labelOf: (dynamic item) => '${item.codcir} - ${item.nomcir}',
-      ),
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickTipoCirurgia(context);
+    await _applyLookupSelection(
+      selection: selection,
+      controller: _circodController,
+      apply: (int? code, String? name) {
+        _circod = code;
+        _tipoCirNome = name;
+      },
     );
-    if (result == null) {
-      return;
-    }
-    setState(() {
-      _circod = result.codcir as int?;
-      _tipoCirNome = result.nomcir as String?;
-      _circodController.text = _circod?.toString() ?? '';
-    });
   }
 
   Widget _buildCadastroTab() {
@@ -450,10 +400,10 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
         _field('No Agenda', _nagecirController),
         _field('No Ropme', _numreqController),
         _field('Data Emissao', _datmovController),
-        _lookupField('Cod Paciente *', _codpacController, _pacNome, _pickPaciente),
-        _lookupField('Cod Medico *', _codmedController, _medNome, _pickMedico),
-        _lookupField('Cod Conv', _codconvController, _convNome, _pickConvenio),
-        _lookupField('Cod Loc Cir', _codcliController, _cliNome, _pickHospital),
+        _lookupField('Paciente *', _codpacController, _pacNome, _pickPaciente),
+        _lookupField('Medico *', _codmedController, _medNome, _pickMedico),
+        _lookupField('Convenio', _codconvController, _convNome, _pickConvenio),
+        _lookupField('Local Cirurgia', _codcliController, _cliNome, _pickHospital),
       ],
     );
   }
@@ -478,7 +428,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
         _dropdown('Lado', _lado, <String>['D', 'E', 'A'], (String? v) => setState(() => _lado = v)),
         _field('Grau', _grauController),
         _field('Cod Trouxe', _codtroController),
-        _lookupField('Cod Tipo Cir', _circodController, _tipoCirNome, _pickTipoCirurgia),
+        _lookupField('Tipo Cirurgia', _circodController, _tipoCirNome, _pickTipoCirurgia),
         _field('Inicio', _hriniController),
         _dropdown('Primaria/Revisao', _priRev, <String>['P', 'R'], (String? v) => setState(() => _priRev = v)),
         _dropdown('Sexo', _sexo, <String>['M', 'F'], (String? v) => setState(() => _sexo = v)),
@@ -531,60 +481,25 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
   }
 
   Widget _field(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-      ),
+    return FormSectionField(
+      label: label,
+      controller: controller,
     );
   }
 
   Widget _multiline(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        controller: controller,
-        minLines: 4,
-        maxLines: 8,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          alignLabelWithHint: true,
-        ),
-      ),
+    return FormSectionField(
+      label: label,
+      controller: controller,
+      maxLines: 8,
     );
   }
 
   Widget _multilineSection(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            minLines: 4,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
-          ),
-        ],
-      ),
+    return FormSectionField(
+      label: label,
+      controller: controller,
+      maxLines: 8,
     );
   }
 
@@ -594,32 +509,12 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     String? nome,
     VoidCallback onSearch,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          TextFormField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: onSearch,
-              ),
-            ),
-          ),
-          if ((nome ?? '').isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                nome!,
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-              ),
-            ),
-        ],
-      ),
+    return FormSectionField(
+      label: label,
+      controller: controller,
+      subtitle: nome,
+      onSearch: onSearch,
+      keyboardType: TextInputType.number,
     );
   }
 
@@ -629,24 +524,18 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     List<String> options,
     ValueChanged<String?> onChanged,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DropdownButtonFormField<String>(
-        value: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        items: options
-            .map(
-              (String option) => DropdownMenuItem<String>(
-                value: option,
-                child: Text(option),
-              ),
-            )
-            .toList(),
-        onChanged: onChanged,
-      ),
+    return FormSectionDropdown<String>(
+      label: label,
+      value: value ?? options.first,
+      items: options
+          .map(
+            (String option) => DropdownMenuItem<String>(
+              value: option,
+              child: Text(option),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
     );
   }
 
@@ -655,24 +544,18 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     String? value,
     ValueChanged<String?> onChanged,
   ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DropdownButtonFormField<String>(
-        value: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        items: kSatisfacaoOptions
-            .map(
-              (MapEntry<String, String> entry) => DropdownMenuItem<String>(
-                value: entry.key,
-                child: Text(entry.value),
-              ),
-            )
-            .toList(),
-        onChanged: onChanged,
-      ),
+    return FormSectionDropdown<String?>(
+      label: label,
+      value: value,
+      items: kSatisfacaoOptions
+          .map(
+            (MapEntry<String, String> entry) => DropdownMenuItem<String?>(
+              value: entry.key,
+              child: Text(entry.value),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
     );
   }
 
@@ -721,78 +604,6 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
           NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
         ],
       ),
-    );
-  }
-}
-
-class _SimpleSearchDelegate extends SearchDelegate<dynamic> {
-  final String title;
-  final Future<List<dynamic>> Function(String query) loadItems;
-  final String Function(dynamic item) labelOf;
-  List<dynamic> _items = <dynamic>[];
-  bool _loaded = false;
-
-  _SimpleSearchDelegate({
-    required this.title,
-    required this.loadItems,
-    required this.labelOf,
-  });
-
-  @override
-  String get searchFieldLabel => title;
-
-  Future<void> _ensureLoaded() async {
-    if (_loaded) {
-      return;
-    }
-    _items = await loadItems(query);
-    _loaded = true;
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _ensureLoaded(),
-      builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return ListView.builder(
-          itemCount: _items.length,
-          itemBuilder: (BuildContext context, int index) {
-            final dynamic item = _items[index];
-            return ListTile(
-              title: Text(labelOf(item)),
-              onTap: () => close(context, item),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) => buildSuggestions(context);
-
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return <Widget>[
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-          _loaded = false;
-          showSuggestions(context);
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () => close(context, null),
     );
   }
 }
