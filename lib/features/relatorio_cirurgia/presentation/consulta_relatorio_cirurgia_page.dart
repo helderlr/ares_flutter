@@ -16,6 +16,7 @@ import '../models/relatorio_cirurgia_model.dart';
 import '../services/relatorio_cirurgia_pdf_service.dart';
 import '../services/relatorio_cirurgia_service.dart';
 import '../utils/relatorio_field_labels.dart';
+import '../../registro_hora_cirurgia/presentation/registro_hora_cirurgia_page.dart';
 import 'relatorio_cirurgia_form_page.dart';
 
 class ConsultaRelatorioCirurgiaPage extends StatefulWidget {
@@ -133,6 +134,19 @@ class _ConsultaRelatorioCirurgiaPageState
     }
   }
 
+  Future<void> _openRegistroHora() async {
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => RegistroHoraCirurgiaPage(
+          relatorio: _currentRelatorio,
+        ),
+      ),
+    );
+    if (changed == true && mounted) {
+      await _loadDetail();
+    }
+  }
+
   Future<void> _editRelatorio() async {
     if (!_access.canEdit) {
       return;
@@ -237,7 +251,7 @@ class _ConsultaRelatorioCirurgiaPageState
             tooltip: 'Compartilhar',
           ),
         ],
-        bottom: _access.hasAnyAction && _isReady ? _buildTopActionBar() : null,
+        bottom: _isReady ? _buildTopActionBar() : null,
       ),
       body: !_isReady || _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -326,6 +340,11 @@ class _ConsultaRelatorioCirurgiaPageState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: <Widget>[
+            _buildTopActionItem(
+              icon: Icons.access_time,
+              label: 'Registro',
+              onTap: _openRegistroHora,
+            ),
             if (_access.canEdit)
               _buildTopActionItem(
                 icon: Icons.edit_outlined,

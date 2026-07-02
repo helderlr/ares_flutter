@@ -260,6 +260,12 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
   }
 
   Widget _buildRelatorioItem(RelatorioCirurgia item) {
+    final String horaCirurgia = item.horaInicioDisplay == '—'
+        ? ''
+        : item.horaInicioDisplay;
+    final String dataLinha = horaCirurgia.isEmpty
+        ? 'Data: ${item.dataCirurgiaDisplay}'
+        : 'Data: ${item.dataCirurgiaDisplay} às $horaCirurgia';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Row(
@@ -275,27 +281,50 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
                 children: <Widget>[
                   Text(
                     item.pacienteName,
-                    style: AppTheme.listItemTitleStyleOf(context),
+                    style: AppTheme.listItemTitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Rel: ${item.nummov} • Agenda: ${item.nagecir ?? '—'}',
-                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    'Rel: ${item.nummov}',
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Médico: ${item.medicoName} • Data: ${item.dataCirurgiaDisplay}',
-                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    'Cirurgia: ${item.tipoCirurgiaDisplay}',
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    dataLinha,
+                    style: AppTheme.listItemSubtitleStyle.copyWith(
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Médico: ${item.medicoName}',
+                    style: AppTheme.listItemSubtitleStyle,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Convênio: ${item.convenioName}',
+                    style: AppTheme.listItemSubtitleStyle,
+                    maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     'Hospital: ${item.hospitalName}',
-                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

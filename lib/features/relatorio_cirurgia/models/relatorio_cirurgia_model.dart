@@ -6,6 +6,12 @@ enum RelatorioVisualStatus {
   semProblema,
 }
 
+enum RegistroHoraStatus {
+  pendente,
+  emAndamento,
+  concluida,
+}
+
 class RelatorioAccess {
   final bool canEdit;
   final bool canDelete;
@@ -90,6 +96,14 @@ class RelatorioCirurgia {
   final String? enderecoInicio;
   final String? enderecoFim;
   final String? deviceId;
+  final DateTime? dtHoraInicio;
+  final DateTime? dtHoraFim;
+  final double? latitudeInicio;
+  final double? longitudeInicio;
+  final double? latitudeFim;
+  final double? longitudeFim;
+  final double? precisaoInicio;
+  final double? precisaoFim;
 
   const RelatorioCirurgia({
     required this.nummov,
@@ -153,6 +167,14 @@ class RelatorioCirurgia {
     this.enderecoInicio,
     this.enderecoFim,
     this.deviceId,
+    this.dtHoraInicio,
+    this.dtHoraFim,
+    this.latitudeInicio,
+    this.longitudeInicio,
+    this.latitudeFim,
+    this.longitudeFim,
+    this.precisaoInicio,
+    this.precisaoFim,
   });
 
   int get id => nummov;
@@ -196,6 +218,155 @@ class RelatorioCirurgia {
       return 'cód. $usulan';
     }
     return nome;
+  }
+
+  String get tipoCirurgiaDisplay {
+    final String? tipo = tipoCirNome?.trim();
+    if (tipo != null && tipo.isNotEmpty) {
+      return tipo;
+    }
+    final String? cirurgia = cirhos?.trim();
+    if (cirurgia != null && cirurgia.isNotEmpty) {
+      return cirurgia;
+    }
+    final String? nome = nomcir?.trim();
+    if (nome != null && nome.isNotEmpty) {
+      return nome;
+    }
+    return 'Cirurgia não informada';
+  }
+
+  bool get hasRegistroHoraInicio =>
+      dtHoraInicio != null || _hasTimeText(hrini);
+
+  bool get hasRegistroHoraFim => dtHoraFim != null || _hasTimeText(hrfin);
+
+  RegistroHoraStatus get registroHoraStatus {
+    if (hasRegistroHoraInicio && hasRegistroHoraFim) {
+      return RegistroHoraStatus.concluida;
+    }
+    if (hasRegistroHoraInicio) {
+      return RegistroHoraStatus.emAndamento;
+    }
+    return RegistroHoraStatus.pendente;
+  }
+
+  String get registroHoraStatusLabel {
+    switch (registroHoraStatus) {
+      case RegistroHoraStatus.concluida:
+        return 'Concluída';
+      case RegistroHoraStatus.emAndamento:
+        return 'Em Andamento';
+      case RegistroHoraStatus.pendente:
+        return 'Pendente';
+    }
+  }
+
+  bool get canEditRegistroHora =>
+      registroHoraStatus != RegistroHoraStatus.concluida;
+
+  bool get canRegistrarHoraInicio =>
+      canEditRegistroHora && !hasRegistroHoraInicio;
+
+  bool get canRegistrarHoraFim =>
+      canEditRegistroHora && hasRegistroHoraInicio && !hasRegistroHoraFim;
+
+  DateTime? get registroHoraInicioResolvido =>
+      resolveRegistroHoraDateTime(dtHoraInicio, hrini);
+
+  DateTime? resolveRegistroHoraDateTime(
+    DateTime? timestamp,
+    String? fallback,
+  ) {
+    if (timestamp != null) {
+      return timestamp;
+    }
+    return _resolveDateTimeFromText(fallback, datcir);
+  }
+
+  int? calcularDuracaoMinutosAte(DateTime fim) {
+    final DateTime? inicio = registroHoraInicioResolvido;
+    if (inicio == null) {
+      return null;
+    }
+    return fim.difference(inicio).inMinutes;
+  }
+
+  bool isDuracaoMenorQueMinutos(DateTime fim, {int minutos = 30}) {
+    final int? duracao = calcularDuracaoMinutosAte(fim);
+    if (duracao == null) {
+      return false;
+    }
+    return duracao < minutos;
+  }
+
+  String get horaInicioDisplay => _formatHoraDisplay(dtHoraInicio, hrini);
+
+  String get horaFimDisplay => _formatHoraDisplay(dtHoraFim, hrfin);
+
+  String get duracaoRegistroHoraDisplay {
+    final DateTime? inicio = registroHoraInicioResolvido;
+    final DateTime? fim = resolveRegistroHoraDateTime(dtHoraFim, hrfin);
+    if (inicio == null || fim == null) {
+      return '—';
+    }
+    final Duration diff = fim.difference(inicio);
+    if (diff.isNegative) {
+      return '—';
+    }
+    final int totalMinutes = diff.inMinutes;
+    final int hours = totalMinutes ~/ 60;
+    final int minutes = totalMinutes % 60;
+    if (hours <= 0) {
+      return '${minutes}min';
+    }
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+  }
+
+  bool get hasLocalizacaoInicio =>
+      latitudeInicio != null && longitudeInicio != null;
+
+  bool get hasLocalizacaoFim => latitudeFim != null && longitudeFim != null;
+
+  static bool _hasTimeText(String? value) {
+    final String trimmed = value?.trim() ?? '';
+    return trimmed.isNotEmpty && trimmed != '—';
+  }
+
+  static String _formatHoraDisplay(DateTime? timestamp, String? fallback) {
+    if (timestamp != null) {
+      return '${timestamp.hour.toString().padLeft(2, '0')}:'
+          '${timestamp.minute.toString().padLeft(2, '0')}';
+    }
+    final String trimmed = fallback?.trim() ?? '';
+    if (trimmed.length >= 5) {
+      return trimmed.substring(0, 5);
+    }
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return '—';
+  }
+
+  static DateTime? _resolveDateTimeFromText(
+    String? fallback,
+    DateTime? baseDate,
+  ) {
+    final String trimmed = fallback?.trim() ?? '';
+    if (trimmed.length < 4) {
+      return null;
+    }
+    final List<String> parts = trimmed.split(':');
+    if (parts.length < 2) {
+      return null;
+    }
+    final int? hour = int.tryParse(parts[0]);
+    final int? minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) {
+      return null;
+    }
+    final DateTime base = baseDate ?? DateTime.now();
+    return DateTime(base.year, base.month, base.day, hour, minute);
   }
 
   RelatorioAccess evaluateAccess(UserPermissions user) {
@@ -291,6 +462,16 @@ class RelatorioCirurgia {
     return text.isEmpty ? null : text;
   }
 
+  static double? _parseDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String && value.trim().isNotEmpty) {
+      return double.tryParse(value.trim());
+    }
+    return null;
+  }
+
   factory RelatorioCirurgia.fromJson(Map<String, dynamic> json) {
     return RelatorioCirurgia(
       nummov: _parseInt(json['nummov']) ?? 0,
@@ -354,6 +535,14 @@ class RelatorioCirurgia {
       enderecoInicio: _parseString(json['endereco_inicio']),
       enderecoFim: _parseString(json['endereco_fim']),
       deviceId: _parseString(json['device_id']),
+      dtHoraInicio: _parseDate(json['dt_hora_inicio']),
+      dtHoraFim: _parseDate(json['dt_hora_fim']),
+      latitudeInicio: _parseDouble(json['latitude_inicio']),
+      longitudeInicio: _parseDouble(json['longitude_inicio']),
+      latitudeFim: _parseDouble(json['latitude_fim']),
+      longitudeFim: _parseDouble(json['longitude_fim']),
+      precisaoInicio: _parseDouble(json['precisao_inicio']),
+      precisaoFim: _parseDouble(json['precisao_fim']),
     );
   }
 
@@ -409,6 +598,14 @@ class RelatorioCirurgia {
       if (enderecoInicio != null) 'endereco_inicio': enderecoInicio,
       if (enderecoFim != null) 'endereco_fim': enderecoFim,
       if (deviceId != null) 'device_id': deviceId,
+      if (dtHoraInicio != null) 'dt_hora_inicio': dtHoraInicio!.toIso8601String(),
+      if (dtHoraFim != null) 'dt_hora_fim': dtHoraFim!.toIso8601String(),
+      if (latitudeInicio != null) 'latitude_inicio': latitudeInicio,
+      if (longitudeInicio != null) 'longitude_inicio': longitudeInicio,
+      if (latitudeFim != null) 'latitude_fim': latitudeFim,
+      if (longitudeFim != null) 'longitude_fim': longitudeFim,
+      if (precisaoInicio != null) 'precisao_inicio': precisaoInicio,
+      if (precisaoFim != null) 'precisao_fim': precisaoFim,
     };
   }
 

@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/constants/app_colors.dart';
-import '../../menu/model/menu_option.dart';
-import '../../menu/presentation/menu_drawer.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/protected_ui.dart';
+import '../../relatorio_cirurgia/models/relatorio_cirurgia_model.dart';
+import '../../relatorio_cirurgia/models/relatorio_list_filters.dart';
+import '../../relatorio_cirurgia/services/relatorio_cirurgia_service_paginado.dart';
+import '../../relatorio_cirurgia/services/relatorio_cirurgia_service.dart';
+import '../services/registro_hora_location_service.dart';
+import '../services/registro_hora_service.dart';
+import 'registro_hora_mapa_page.dart';
 
 class RegistroHoraCirurgiaPage extends StatefulWidget {
-  const RegistroHoraCirurgiaPage({super.key});
+  final List<RelatorioCirurgia>? initialItens;
+  final RelatorioListFilters? filters;
+  final RelatorioCirurgia? relatorio;
+
+  const RegistroHoraCirurgiaPage({
+    super.key,
+    this.initialItens,
+    this.filters,
+    this.relatorio,
+  });
+
+  bool get isSingleRelatorio => relatorio != null;
 
   @override
   State<RegistroHoraCirurgiaPage> createState() =>
@@ -12,38 +31,89 @@ class RegistroHoraCirurgiaPage extends StatefulWidget {
 }
 
 class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
-  final List<Map<String, dynamic>> _registros = [
-    {
-      'id': 1,
-      'paciente': 'João Silva',
-      'cirurgia': 'Cirurgia Cardíaca',
-      'dataCirurgia': '2025-01-15',
-      'horaInicio': '08:00',
-      'horaFim': '12:00',
-      'duracao': '4h 00min',
-      'status': 'Concluída',
-    },
-    {
-      'id': 2,
-      'paciente': 'Maria Santos',
-      'cirurgia': 'Cirurgia Ortopédica',
-      'dataCirurgia': '2025-01-15',
-      'horaInicio': '14:00',
-      'horaFim': '16:30',
-      'duracao': '2h 30min',
-      'status': 'Em Andamento',
-    },
-    {
-      'id': 3,
-      'paciente': 'Pedro Oliveira',
-      'cirurgia': 'Cirurgia Neurológica',
-      'dataCirurgia': '2025-01-16',
-      'horaInicio': '09:00',
-      'horaFim': '11:45',
-      'duracao': '2h 45min',
-      'status': 'Concluída',
-    },
-  ];
+  final RegistroHoraService _service = RegistroHoraService();
+  final RelatorioCirurgiaService _relatorioService = RelatorioCirurgiaService();
+  final RelatorioCirurgiaServicePaginado _listService =
+      RelatorioCirurgiaServicePaginado();
+  final List<RelatorioCirurgia> _itens = <RelatorioCirurgia>[];
+  bool _isLoading = false;
+  bool _isSaving = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadItens();
+  }
+
+  Future<void> _loadItens() async {
+    if (widget.relatorio != null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _itens.clear();
+      });
+      try {
+        final RelatorioCirurgia? fresh =
+            await _relatorioService.getById(widget.relatorio!.nummov);
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _itens.add(fresh ?? widget.relatorio!);
+          _isLoading = false;
+        });
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _itens.add(widget.relatorio!);
+          _isLoading = false;
+          _errorMessage = error.toString();
+        });
+      }
+      return;
+    }
+    if (widget.initialItens != null && widget.initialItens!.isNotEmpty) {
+      setState(() {
+        _itens
+          ..clear()
+          ..addAll(widget.initialItens!);
+        _errorMessage = null;
+      });
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _itens.clear();
+    });
+    try {
+      final RelatorioListFilters filters = widget.filters ??
+          RelatorioListFilters(
+            dateFrom: DateTime.now(),
+            dateTo: RelatorioListFilters.maxAllowedDate(),
+          );
+      final RelatorioCirurgiaPaginatedResponse response =
+          await _listService.fetchPaginated(page: 1, filters: filters);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _itens.addAll(response.itens);
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.toString();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,26 +122,15 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
         title: const Text('Registro Hora Cirurgia'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(widget.isSingleRelatorio),
           tooltip: 'Voltar',
         ),
       ),
-      drawer: MenuDrawer(
-        userName: '',
-        userPhone: '',
-        atendimento: const <MenuOption>[],
-        faturamento: const <MenuOption>[],
-        estoque: const <MenuOption>[],
-        miscelanea: const <MenuOption>[],
-        footerOptions: const <MenuOption>[],
-        onOptionTap: (MenuOption option) {},
-      ),
       body: Column(
-        children: [
-          // Header com informações
+        children: <Widget>[
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.lightBlue.withOpacity(0.1),
               border: Border(
@@ -82,7 +141,7 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              children: <Widget>[
                 Text(
                   'Controle de Tempo de Cirurgias',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -90,141 +149,191 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
                         color: AppColors.lightBlue,
                       ),
                 ),
-                const SizedBox(height: 8.0),
+                const SizedBox(height: 8),
                 Text(
                   'Acompanhe o tempo de duração das cirurgias e registre os horários de início e fim.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
+                        color: Colors.grey.shade600,
                       ),
                 ),
               ],
             ),
           ),
-
-          // Lista de registros
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _registros.length,
-              itemBuilder: (context, index) {
-                final registro = _registros[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12.0),
-                  elevation: 2.0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                registro['paciente'],
-                                style: const TextStyle(
-                                  fontSize: 18.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
-                                vertical: 4.0,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _getStatusColor(registro['status'])
-                                    .withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12.0),
-                                border: Border.all(
-                                  color: _getStatusColor(registro['status'])
-                                      .withOpacity(0.3),
-                                ),
-                              ),
-                              child: Text(
-                                registro['status'],
-                                style: TextStyle(
-                                  fontSize: 12.0,
-                                  fontWeight: FontWeight.w600,
-                                  color: _getStatusColor(registro['status']),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8.0),
-                        Text(
-                          registro['cirurgia'],
-                          style: TextStyle(
-                            fontSize: 16.0,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 12.0),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildInfoItem(
-                                icon: Icons.calendar_today,
-                                label: 'Data',
-                                value: _formatDate(registro['dataCirurgia']),
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildInfoItem(
-                                icon: Icons.access_time,
-                                label: 'Início',
-                                value: registro['horaInicio'],
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildInfoItem(
-                                icon: Icons.schedule,
-                                label: 'Fim',
-                                value: registro['horaFim'],
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildInfoItem(
-                                icon: Icons.timer,
-                                label: 'Duração',
-                                value: registro['duracao'],
-                                isHighlight: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12.0),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => _editarRegistro(registro),
-                              icon: const Icon(Icons.edit, size: 16.0),
-                              label: const Text('Editar'),
-                            ),
-                            const SizedBox(width: 8.0),
-                            TextButton.icon(
-                              onPressed: () => _visualizarDetalhes(registro),
-                              icon: const Icon(Icons.visibility, size: 16.0),
-                              label: const Text('Detalhes'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _adicionarRegistro,
-        backgroundColor: AppColors.lightBlue,
-        child: const Icon(Icons.add, color: Colors.white),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(_errorMessage!),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: _loadItens,
+                child: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_itens.isEmpty) {
+      return const Center(child: Text('Nenhum relatório encontrado.'));
+    }
+    return RefreshIndicator(
+      onRefresh: _loadItens,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _itens.length,
+        itemBuilder: (BuildContext context, int index) {
+          return _buildCard(_itens[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCard(RelatorioCirurgia item, int index) {
+    final String statusLabel = item.registroHoraStatusLabel;
+    final Color statusColor = _statusColor(item.registroHoraStatus);
+    final String horaCirurgia = item.horaInicioDisplay == '—'
+        ? ''
+        : item.horaInicioDisplay;
+    final String dataLinha = horaCirurgia.isEmpty
+        ? item.dataCirurgiaDisplay
+        : '${item.dataCirurgiaDisplay} às $horaCirurgia';
+    final String noRel = '${item.numrel ?? item.nummov}';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    item.pacienteName,
+                    style: AppTheme.listItemTitleStyle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _buildStatusBadge(statusLabel, statusColor),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item.tipoCirurgiaDisplay,
+              style: AppTheme.listItemSubtitleStyle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Data: $dataLinha',
+              style: AppTheme.listItemSubtitleStyle.copyWith(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: _buildInfoItem(
+                    icon: Icons.access_time,
+                    label: 'Início',
+                    value: item.horaInicioDisplay,
+                    compact: true,
+                  ),
+                ),
+                Expanded(
+                  child: _buildInfoItem(
+                    icon: Icons.schedule,
+                    label: 'Fim',
+                    value: item.horaFimDisplay,
+                    compact: true,
+                  ),
+                ),
+                Expanded(
+                  child: _buildInfoItem(
+                    icon: Icons.timer,
+                    label: 'Duração',
+                    value: item.duracaoRegistroHoraDisplay,
+                    isHighlight: true,
+                    compact: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'No Rel: $noRel',
+                    style: AppTheme.listItemSubtitleStyle.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: item.canRegistrarHoraInicio && !_isSaving
+                      ? () => _registrarHora(item, index, RegistroHoraCampo.inicio)
+                      : null,
+                  icon: const Icon(Icons.play_arrow, size: 16),
+                  label: const Text('Início'),
+                ),
+                TextButton.icon(
+                  onPressed: item.canRegistrarHoraFim && !_isSaving
+                      ? () => _registrarHora(item, index, RegistroHoraCampo.fim)
+                      : null,
+                  icon: const Icon(Icons.stop, size: 16),
+                  label: const Text('Fim'),
+                ),
+                TextButton.icon(
+                  onPressed: () => _abrirDetalhes(item),
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('Detalhes'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -234,27 +343,30 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
     required String label,
     required String value,
     bool isHighlight = false,
+    bool compact = false,
   }) {
+    final double valueSize = compact ? 11 : 14;
+    final double labelSize = compact ? 10 : 12;
     return Column(
-      children: [
+      children: <Widget>[
         Icon(
           icon,
-          size: 16.0,
-          color: isHighlight ? AppColors.lightBlue : Colors.grey[600],
+          size: compact ? 14 : 16,
+          color: isHighlight ? AppColors.lightBlue : Colors.grey.shade600,
         ),
-        const SizedBox(height: 4.0),
+        const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12.0,
-            color: Colors.grey[600],
-          ),
+          style: TextStyle(fontSize: labelSize, color: Colors.grey.shade600),
         ),
-        const SizedBox(height: 2.0),
+        const SizedBox(height: 2),
         Text(
           value,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 14.0,
+            fontSize: valueSize,
             fontWeight: FontWeight.w600,
             color: isHighlight ? AppColors.lightBlue : Colors.black87,
           ),
@@ -263,83 +375,157 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _statusColor(RegistroHoraStatus status) {
     switch (status) {
-      case 'Concluída':
+      case RegistroHoraStatus.concluida:
         return Colors.green;
-      case 'Em Andamento':
+      case RegistroHoraStatus.emAndamento:
         return Colors.orange;
-      case 'Cancelada':
-        return Colors.red;
-      default:
+      case RegistroHoraStatus.pendente:
         return Colors.grey;
     }
   }
 
-  String _formatDate(String date) {
-    final parts = date.split('-');
-    if (parts.length == 3) {
-      return '${parts[2]}/${parts[1]}/${parts[0]}';
+  Future<void> _registrarHora(
+    RelatorioCirurgia item,
+    int index,
+    RegistroHoraCampo campo,
+  ) async {
+    if (!_service.podeRegistrarCampo(item, campo)) {
+      final String message = campo == RegistroHoraCampo.fim
+          ? 'Registre a hora de início antes da hora de fim.'
+          : 'Este horário não pode ser registrado no momento.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      return;
     }
-    return date;
-  }
-
-  void _editarRegistro(Map<String, dynamic> registro) {
-    showDialog(
+    final TimeOfDay initial = TimeOfDay.now();
+    final bool? confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Editar Registro'),
-        content:
-            const Text('Funcionalidade de edição será implementada em breve.'),
-        actions: [
+      builder: (BuildContext context) => AlertDialog(
+        title: Text(_service.labelCampo(campo)),
+        content: Text(
+          campo == RegistroHoraCampo.inicio
+              ? 'Informe a hora de início da cirurgia. A localização atual será registrada.'
+              : 'Informe a hora de fim da cirurgia. A localização atual será registrada.',
+        ),
+        actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continuar'),
           ),
         ],
       ),
     );
-  }
-
-  void _visualizarDetalhes(Map<String, dynamic> registro) {
-    showDialog(
+    if (confirm != true || !mounted) {
+      return;
+    }
+    final TimeOfDay? picked = await showProtectedTimePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Detalhes - ${registro['paciente']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Cirurgia: ${registro['cirurgia']}'),
-            Text('Data: ${_formatDate(registro['dataCirurgia'])}'),
-            Text('Horário: ${registro['horaInicio']} - ${registro['horaFim']}'),
-            Text('Duração: ${registro['duracao']}'),
-            Text('Status: ${registro['status']}'),
+      initialTime: initial,
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+    final DateTime hora = _service.buildDataHoraBase(item, picked);
+    if (campo == RegistroHoraCampo.fim &&
+        item.isDuracaoMenorQueMinutos(
+          hora,
+          minutos: RegistroHoraService.duracaoMinimaAvisoMinutos,
+        )) {
+      final bool? confirmarCurta = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Duração curta'),
+          content: Text(
+            'A diferença entre o fim e o início é inferior a '
+            '${RegistroHoraService.duracaoMinimaAvisoMinutos} minutos. '
+            'Deseja registrar mesmo assim?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Registrar'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Fechar'),
+      );
+      if (confirmarCurta != true || !mounted) {
+        return;
+      }
+    }
+    setState(() => _isSaving = true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Registrando hora e localização...'),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
+    try {
+      final RegistroHoraLocationCapture? localizacao =
+          await RegistroHoraLocationService.capture();
+      final RelatorioCirurgia atualizado = await _service.salvarHora(
+        item: item,
+        campo: campo,
+        hora: hora,
+        localizacao: localizacao,
+      );
+      final RelatorioCirurgia? refreshed =
+          await _relatorioService.getById(item.nummov);
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop();
+      setState(() {
+        _itens[index] = refreshed ?? atualizado;
+        _isSaving = false;
+      });
+      final String campoLabel =
+          campo == RegistroHoraCampo.inicio ? 'início' : 'fim';
+      final String locationMsg = localizacao == null
+          ? 'Hora de $campoLabel salva. Localização não capturada.'
+          : 'Hora de $campoLabel e localização salvas com sucesso.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(locationMsg)),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop();
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao salvar: $error')),
+      );
+    }
   }
 
-  void _adicionarRegistro() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Novo Registro'),
-        content: const Text(
-            'Funcionalidade de adicionar registro será implementada em breve.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
+  Future<void> _abrirDetalhes(RelatorioCirurgia item) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RegistroHoraMapaPage(relatorio: item),
       ),
     );
   }

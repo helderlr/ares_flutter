@@ -789,10 +789,6 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         _multilineSection('Observacao', _historicoController),
-        _multilineSection('Material da Cirurgia', _sistemaAplicadoController),
-        _multilineSection('Obs Estoque', _obsEstoqueController),
-        _multilineSection('Obs Gerencia', _obsGerenciaController),
-        _multilineSection('Obs RT', _obsRtController),
       ],
     );
   }
@@ -801,14 +797,13 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        _multiline('Problema Cirurgia', _problemaController),
-        _dropdown('Problema Cirurgia (flag)', _relProb, <String>['S', 'N'],
-            (String? v) => setState(() => _relProb = v)),
-        _multiline('Problema retorno material', _problemaRetornoController),
-        _multiline('Problema imp', _problemaImpController),
-        _field('Medida tomada estoque', _medidaEstoqueController),
-        _field('Endereco inicio', _enderecoInicioController),
-        _field('Endereco fim', _enderecoFimController),
+        _multiline('Problema', _problemaController),
+        _dropdown(
+          'Problema na cirurgia',
+          _relProb,
+          <String>['S', 'N'],
+          (String? v) => setState(() => _relProb = v),
+        ),
       ],
     );
   }
