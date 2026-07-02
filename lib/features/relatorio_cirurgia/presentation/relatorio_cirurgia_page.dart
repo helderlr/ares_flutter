@@ -1,10 +1,22 @@
 import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/screen_capture_service.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/share_format_sheet.dart';
 import '../models/relatorio_cirurgia_model.dart';
 import '../models/relatorio_list_filters.dart';
 import '../services/relatorio_cirurgia_service_paginado.dart';
+import '../services/relatorio_cirurgia_pdf_service.dart';
 import '../widgets/relatorio_filter_dialog.dart';
+import '../widgets/relatorio_status_legend.dart';
+import '../../agendamento/services/agenda_relatorio_export_service.dart';
+import '../../agendamento/services/empresa_report_service.dart';
+import '../../login/models/user_model.dart';
+import '../../login/services/auth_service.dart';
+import 'consulta_relatorio_cirurgia_page.dart';
 import 'relatorio_cirurgia_form_page.dart';
 
 class RelatorioCirurgiaPage extends StatefulWidget {
@@ -17,8 +29,12 @@ class RelatorioCirurgiaPage extends StatefulWidget {
 class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
   final RelatorioCirurgiaServicePaginado _service =
       RelatorioCirurgiaServicePaginado();
+  final RelatorioCirurgiaPdfService _pdfService =
+      RelatorioCirurgiaPdfService();
+  final EmpresaReportService _empresaService = EmpresaReportService();
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final GlobalKey _shareKey = GlobalKey();
   final List<RelatorioCirurgia> _itens = <RelatorioCirurgia>[];
   RelatorioCirurgiaPaginationInfo? _pagination;
   RelatorioListFilters _filters = RelatorioListFilters(
@@ -27,6 +43,7 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
   );
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isSharing = false;
   String _searchQuery = '';
   Timer? _searchDebounce;
 
@@ -169,15 +186,126 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
     );
   }
 
-  Future<void> _openForm([RelatorioCirurgia? item]) async {
+  Future<void> _openConsulta(RelatorioCirurgia item) async {
+    final bool? changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ConsultaRelatorioCirurgiaPage(relatorio: item),
+      ),
+    );
+    if (changed == true) {
+      await _loadFirstPage();
+    }
+  }
+
+  Future<void> _openNewForm() async {
     final bool? saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => RelatorioCirurgiaFormPage(relatorio: item),
+        builder: (_) => const RelatorioCirurgiaFormPage(),
       ),
     );
     if (saved == true) {
       await _loadFirstPage();
     }
+  }
+
+  Future<void> _shareRelatorioList() async {
+    final ShareFormat? format = await ShareFormatSheet.show(context);
+    if (format == null || !mounted) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      if (format == ShareFormat.image) {
+        final Uint8List? bytes =
+            await ScreenCaptureService.capturePng(_shareKey);
+        if (bytes == null) {
+          throw Exception('Não foi possível capturar a imagem.');
+        }
+        await ScreenCaptureService.sharePngBytes(
+          bytes: bytes,
+          fileName: 'relatorio_cirurgia_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Relatório Cirurgia Ares',
+        );
+        return;
+      }
+      final List<RelatorioCirurgia> items =
+          await _service.fetchAllRelatorios(filters: _filters);
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhum registro para compartilhar.')),
+        );
+        return;
+      }
+      final UserModel? user = await AuthService.getCurrentUser();
+      final empresa = await _empresaService.fetchReportData();
+      final Uint8List pdf = await _pdfService.buildRelatorioCirurgiaPdf(
+        items: items,
+        filters: _filters,
+        empresa: empresa,
+        usuario: user,
+      );
+      await AgendaRelatorioExportService.sharePdf(
+        bytes: pdf,
+        fileName: 'rel_cirurgia_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    } catch (error) {
+      if (mounted) {
+        _showError(error.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
+  }
+
+  Widget _buildRelatorioItem(RelatorioCirurgia item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          RelatorioStatusLegend.buildBallForRelatorio(item, size: 28),
+          const SizedBox(width: 16),
+          Expanded(
+            child: InkWell(
+              onTap: () => _openConsulta(item),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    item.pacienteName,
+                    style: AppTheme.listItemTitleStyleOf(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Rel: ${item.nummov} • Agenda: ${item.nagecir ?? '—'}',
+                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Médico: ${item.medicoName} • Data: ${item.dataCirurgiaDisplay}',
+                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Hospital: ${item.hospitalName}',
+                    style: AppTheme.listItemSubtitleStyleOf(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
+        ],
+      ),
+    );
   }
 
   @override
@@ -189,6 +317,20 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
         foregroundColor: Colors.white,
         actions: <Widget>[
           IconButton(
+            onPressed: _isSharing || _isLoading ? null : _shareRelatorioList,
+            icon: _isSharing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.share),
+            tooltip: 'Compartilhar',
+          ),
+          IconButton(
             onPressed: _isLoading ? null : _openFilters,
             icon: Badge(
               isLabelVisible: _filtersActive,
@@ -197,99 +339,89 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(),
-        child: const Icon(Icons.add),
-      ),
-      body: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar paciente, médico, hospital...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+      body: RepaintBoundary(
+        key: _shareKey,
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar paciente, médico, hospital...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _itens.isEmpty
+                        ? const Center(child: Text('Nenhum relatório encontrado.'))
+                        : RefreshIndicator(
+                            onRefresh: _loadFirstPage,
+                            child: ListView.separated(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              itemCount:
+                                  _itens.length + (_isLoadingMore ? 1 : 0),
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (BuildContext context, int index) {
+                                if (index >= _itens.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+                                return _buildRelatorioItem(_itens[index]);
+                              },
+                            ),
+                          ),
+              ),
+            ],
           ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _itens.isEmpty
-                    ? const Center(child: Text('Nenhum relatório encontrado.'))
-                    : RefreshIndicator(
-                        onRefresh: _loadFirstPage,
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.only(top: 8),
-                          itemCount: _itens.length + (_isLoadingMore ? 1 : 0),
-                          itemBuilder: (BuildContext context, int index) {
-                            if (index >= _itens.length) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Center(child: CircularProgressIndicator()),
-                              );
-                            }
-                            final RelatorioCirurgia item = _itens[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              child: ListTile(
-                                title: Row(
-                                  children: <Widget>[
-                                    Expanded(
-                                      child: Text(
-                                        item.pacienteName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      item.dataCirurgiaDisplay,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    Text('Rel: ${item.nummov} • Agenda: ${item.nagecir ?? '—'}'),
-                                    Text(
-                                      item.medicoName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      item.hospitalName,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                                isThreeLine: true,
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => _openForm(item),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+        ),
+      ),
+      bottomNavigationBar: BottomAppBar(
+        height: 60,
+        color: Colors.lightBlue,
+        child: SafeArea(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: <Widget>[
+              InkWell(
+                onTap: () => RelatorioStatusLegend.showLegendDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: const Text(
+                    'Legenda',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => _openNewForm(),
+                child: const Icon(Icons.add, size: 32, color: Colors.white),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
-

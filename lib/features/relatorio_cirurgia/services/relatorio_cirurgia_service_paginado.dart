@@ -72,6 +72,29 @@ class RelatorioCirurgiaServicePaginado {
     );
   }
 
+  Future<List<RelatorioCirurgia>> fetchAllRelatorios({
+    RelatorioListFilters? filters,
+    String? searchQuery,
+    int pageSize = 200,
+  }) async {
+    final List<RelatorioCirurgia> allItems = <RelatorioCirurgia>[];
+    int page = 1;
+    while (true) {
+      final RelatorioCirurgiaPaginatedResponse response = await fetchPaginated(
+        page: page,
+        pageSize: pageSize,
+        searchQuery: searchQuery,
+        filters: filters,
+      );
+      allItems.addAll(response.itens);
+      if (!response.pagination.hasNextPage) {
+        break;
+      }
+      page++;
+    }
+    return allItems;
+  }
+
   Map<String, String> _buildFilterExtra(RelatorioListFilters? filters) {
     final Map<String, String> extra = <String, String>{};
     if (filters == null) {

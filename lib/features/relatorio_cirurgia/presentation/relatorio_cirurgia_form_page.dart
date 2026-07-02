@@ -1,9 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/permissions/user_permissions.dart';
 import '../../../core/widgets/entity_lookup_picker.dart';
 import '../../../core/widgets/form_section_field.dart';
+import '../../../core/widgets/protected_ui.dart';
+import '../../agendamento/models/agendamento_model.dart';
+import '../../agendamento/services/agendamento_service.dart';
+import '../../login/services/auth_service.dart';
 import '../models/relatorio_cirurgia_model.dart';
 import '../services/relatorio_cirurgia_service.dart';
+import '../utils/relatorio_field_labels.dart';
 
 class RelatorioCirurgiaFormPage extends StatefulWidget {
   final RelatorioCirurgia? relatorio;
@@ -17,38 +24,38 @@ class RelatorioCirurgiaFormPage extends StatefulWidget {
 
 class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
   final RelatorioCirurgiaService _service = RelatorioCirurgiaService();
+  final AgendamentoService _agendaService = AgendamentoService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   int _tabIndex = 0;
   bool _isSaving = false;
+  bool _isLoadingAgenda = false;
+  bool _canEdit = true;
+  String? _blockMessage;
   int? _codpac;
   int? _codmed;
   int? _codcli;
   int? _codconv;
   int? _circod;
+  int? _codins;
+  int? _codcir;
   String? _pacNome;
   String? _medNome;
   String? _cliNome;
   String? _convNome;
   String? _tipoCirNome;
-  final TextEditingController _numrelController = TextEditingController();
+  String? _digitadoPorNome;
   final TextEditingController _nagecirController = TextEditingController();
   final TextEditingController _numreqController = TextEditingController();
   final TextEditingController _datmovController = TextEditingController();
-  final TextEditingController _codpacController = TextEditingController();
-  final TextEditingController _codmedController = TextEditingController();
-  final TextEditingController _codconvController = TextEditingController();
-  final TextEditingController _codcliController = TextEditingController();
-  final TextEditingController _codinsController = TextEditingController();
+  final TextEditingController _nomeInstrController = TextEditingController();
   final TextEditingController _inshosController = TextEditingController();
   final TextEditingController _hrfinController = TextEditingController();
-  final TextEditingController _codcirController = TextEditingController();
   final TextEditingController _nomcirController = TextEditingController();
   final TextEditingController _codlevController = TextEditingController();
   final TextEditingController _sistemaController = TextEditingController();
   final TextEditingController _idadeController = TextEditingController();
   final TextEditingController _cirhosController = TextEditingController();
   final TextEditingController _codtroController = TextEditingController();
-  final TextEditingController _circodController = TextEditingController();
   final TextEditingController _datcirController = TextEditingController();
   final TextEditingController _hriniController = TextEditingController();
   final TextEditingController _nprontuarioController = TextEditingController();
@@ -58,24 +65,31 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
   final TextEditingController _obsGerenciaController = TextEditingController();
   final TextEditingController _obsRtController = TextEditingController();
   final TextEditingController _problemaController = TextEditingController();
-  final TextEditingController _problemaRetornoController = TextEditingController();
+  final TextEditingController _problemaRetornoController =
+      TextEditingController();
   final TextEditingController _problemaImpController = TextEditingController();
-  final TextEditingController _medidaEstoqueController = TextEditingController();
-  final TextEditingController _sistemaAplicadoController = TextEditingController();
-  final TextEditingController _enderecoInicioController = TextEditingController();
+  final TextEditingController _medidaEstoqueController =
+      TextEditingController();
+  final TextEditingController _sistemaAplicadoController =
+      TextEditingController();
+  final TextEditingController _enderecoInicioController =
+      TextEditingController();
   final TextEditingController _enderecoFimController = TextEditingController();
+  final TextEditingController _digitadoPorController = TextEditingController();
   String? _lado;
-  String? _priRev;
   String? _sexo;
-  String? _status;
-  String? _urgencia;
+  String? _statusDisplay;
+  String? _urgenciaDisplay;
+  String? _priRevDisplay;
   String? _relProb;
   String? _satisfacaoMatHospital;
   String? _satisfacaoInstHospital;
   String? _satisfacaoMatCirurg;
   String? _satisfacaoInstCirurg;
+  Timer? _nagecirDebounce;
 
   bool get _isEditing => widget.relatorio != null;
+  bool get _isReadOnly => !_canEdit;
 
   @override
   void initState() {
@@ -85,35 +99,52 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     } else {
       final DateTime today = DateTime.now();
       _datmovController.text = _formatDateBr(today);
-      _priRev = 'P';
       _sexo = 'M';
-      _urgencia = 'N';
       _relProb = 'N';
-      _status = 'N';
+    }
+    _nagecirController.addListener(_onNagecirChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _validateAccess();
+      _loadDigitadorForNew();
+    });
+  }
+
+  Future<void> _loadDigitadorForNew() async {
+    if (_isEditing) {
+      return;
+    }
+    final int? codusu = await AuthService.getCurrentCodusu();
+    final dynamic user = await AuthService.getCurrentUser();
+    if (!mounted) {
+      return;
+    }
+    final String? nome = user?.nome?.toString();
+    if (codusu != null || (nome != null && nome.isNotEmpty)) {
+      setState(() {
+        _digitadoPorNome = nome;
+        _digitadoPorController.text = nome != null && nome.isNotEmpty
+            ? '$nome (cód. $codusu)'
+            : 'cód. $codusu';
+      });
     }
   }
 
   @override
   void dispose() {
-    _numrelController.dispose();
+    _nagecirDebounce?.cancel();
+    _nagecirController.removeListener(_onNagecirChanged);
     _nagecirController.dispose();
     _numreqController.dispose();
     _datmovController.dispose();
-    _codpacController.dispose();
-    _codmedController.dispose();
-    _codconvController.dispose();
-    _codcliController.dispose();
-    _codinsController.dispose();
+    _nomeInstrController.dispose();
     _inshosController.dispose();
     _hrfinController.dispose();
-    _codcirController.dispose();
     _nomcirController.dispose();
     _codlevController.dispose();
     _sistemaController.dispose();
     _idadeController.dispose();
     _cirhosController.dispose();
     _codtroController.dispose();
-    _circodController.dispose();
     _datcirController.dispose();
     _hriniController.dispose();
     _nprontuarioController.dispose();
@@ -129,7 +160,30 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     _sistemaAplicadoController.dispose();
     _enderecoInicioController.dispose();
     _enderecoFimController.dispose();
+    _digitadoPorController.dispose();
     super.dispose();
+  }
+
+  Future<void> _validateAccess() async {
+    if (!_isEditing) {
+      return;
+    }
+    final UserPermissions permissions = await AuthService.getUserPermissions();
+    final RelatorioAccess access =
+        widget.relatorio!.evaluateAccess(permissions);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _canEdit = access.canEdit;
+      _blockMessage = access.blockReason;
+    });
+    if (!access.canEdit) {
+      setState(() {
+        _canEdit = false;
+        _blockMessage = access.blockReason;
+      });
+    }
   }
 
   String _formatDateBr(DateTime date) {
@@ -159,37 +213,156 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return int.tryParse(text);
   }
 
+  void _onNagecirChanged() {
+    if (_isReadOnly) {
+      return;
+    }
+    _nagecirDebounce?.cancel();
+    _nagecirDebounce = Timer(const Duration(milliseconds: 800), () {
+      final int? nagecir = _parseIntField(_nagecirController);
+      if (nagecir != null && nagecir > 0) {
+        _loadFromAgenda();
+      }
+    });
+  }
+
+  Future<void> _loadFromAgenda() async {
+    if (_isReadOnly) {
+      return;
+    }
+    final int? nagecir = _parseIntField(_nagecirController);
+    if (nagecir == null) {
+      return;
+    }
+    setState(() => _isLoadingAgenda = true);
+    try {
+      final AgendaCirurgia? agenda =
+          await _agendaService.fetchAgendaById(nagecir);
+      if (!mounted) {
+        return;
+      }
+      if (agenda == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Agenda nao encontrada.')),
+        );
+        return;
+      }
+      setState(() {
+        _codpac = agenda.codpac;
+        _pacNome = agenda.nompac;
+        _codmed = agenda.codmed;
+        _medNome = agenda.nommed;
+        _codcli = agenda.codcli;
+        _cliNome = agenda.nomcli;
+        _codconv = agenda.codconv;
+        _convNome = agenda.nomconv;
+        _circod = agenda.codcir;
+        _tipoCirNome = agenda.tipoCirurgiaDisplay;
+        _lado = agenda.lado;
+        _priRevDisplay = RelatorioFieldLabels.priRevToDisplay(agenda.primrev);
+        _urgenciaDisplay =
+            RelatorioFieldLabels.snToDisplay(agenda.cirurgiaUrgencia);
+        _codins = agenda.codinstru1;
+        _nomeInstrController.text = agenda.nominstru1 ?? '';
+        if (agenda.datcir != null) {
+          _datcirController.text = _formatDateBr(agenda.datcir!);
+        }
+        if ((agenda.horcir ?? '').trim().isNotEmpty) {
+          _hriniController.text = agenda.horcir!.trim();
+        }
+        if (agenda.numreq != null) {
+          _numreqController.text = agenda.numreq.toString();
+        }
+        if ((agenda.procir ?? '').trim().isNotEmpty &&
+            _nomcirController.text.trim().isEmpty) {
+          _nomcirController.text = agenda.procir!.trim();
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingAgenda = false);
+      }
+    }
+  }
+
+  Future<void> _pickDate(TextEditingController controller) async {
+    if (_isReadOnly) {
+      return;
+    }
+    final DateTime initial =
+        _parseDateBr(controller.text) ?? DateTime.now();
+    final DateTime? picked = await showProtectedDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+    if (picked != null && mounted) {
+      setState(() => controller.text = _formatDateBr(picked));
+    }
+  }
+
+  Future<void> _pickTime(TextEditingController controller) async {
+    if (_isReadOnly) {
+      return;
+    }
+    TimeOfDay initial = const TimeOfDay(hour: 8, minute: 0);
+    final String current = controller.text.trim();
+    final RegExp pattern = RegExp(r'^(\d{1,2}):(\d{2})');
+    final Match? match = pattern.firstMatch(current);
+    if (match != null) {
+      initial = TimeOfDay(
+        hour: int.parse(match.group(1)!),
+        minute: int.parse(match.group(2)!),
+      );
+    }
+    final TimeOfDay? picked = await showProtectedTimePicker(
+      context: context,
+      initialTime: initial,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        controller.text =
+            '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
   void _loadFrom(RelatorioCirurgia item) {
     _codpac = item.codpac;
     _codmed = item.codmed;
     _codcli = item.codcli;
     _codconv = item.codconv;
     _circod = item.circod;
+    _codins = item.codins;
+    _codcir = item.codcir;
     _pacNome = item.pacNome;
     _medNome = item.medNome;
     _cliNome = item.cliNome;
     _convNome = item.convNome;
     _tipoCirNome = item.tipoCirNome;
-    _numrelController.text = item.numrel?.toString() ?? '';
+    _digitadoPorNome = item.digitadorLabel;
     _nagecirController.text = item.nagecir?.toString() ?? '';
     _numreqController.text = item.numreq?.toString() ?? '';
-    _datmovController.text = item.datmov != null ? _formatDateBr(item.datmov!) : '';
-    _codpacController.text = item.codpac?.toString() ?? '';
-    _codmedController.text = item.codmed?.toString() ?? '';
-    _codconvController.text = item.codconv?.toString() ?? '';
-    _codcliController.text = item.codcli?.toString() ?? '';
-    _codinsController.text = item.codins?.toString() ?? '';
+    _datmovController.text =
+        item.datmov != null ? _formatDateBr(item.datmov!) : '';
+    _nomeInstrController.text = '';
     _inshosController.text = item.inshos ?? '';
     _hrfinController.text = item.hrfin ?? '';
-    _codcirController.text = item.codcir?.toString() ?? '';
     _nomcirController.text = item.nomcir ?? '';
     _codlevController.text = item.codlev?.toString() ?? '';
     _sistemaController.text = item.sistema ?? '';
     _idadeController.text = item.idade?.toString() ?? '';
     _cirhosController.text = item.cirhos ?? '';
     _codtroController.text = item.codtro?.toString() ?? '';
-    _circodController.text = item.circod?.toString() ?? '';
-    _datcirController.text = item.datcir != null ? _formatDateBr(item.datcir!) : '';
+    _datcirController.text =
+        item.datcir != null ? _formatDateBr(item.datcir!) : '';
     _hriniController.text = item.hrini ?? '';
     _nprontuarioController.text = item.nprontuario ?? '';
     _grauController.text = item.grau ?? '';
@@ -204,11 +377,12 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     _sistemaAplicadoController.text = item.sistemaAplicado ?? '';
     _enderecoInicioController.text = item.enderecoInicio ?? '';
     _enderecoFimController.text = item.enderecoFim ?? '';
+    _digitadoPorController.text = item.digitadorLabel;
     _lado = item.lado;
-    _priRev = item.priRev ?? 'P';
+    _priRevDisplay = RelatorioFieldLabels.priRevToDisplay(item.priRev);
     _sexo = item.sexo ?? 'M';
-    _status = item.status ?? 'N';
-    _urgencia = item.urgencia ?? 'N';
+    _statusDisplay = RelatorioFieldLabels.snToDisplay(item.status);
+    _urgenciaDisplay = RelatorioFieldLabels.snToDisplay(item.urgencia);
     _relProb = item.relProb ?? 'N';
     _satisfacaoMatHospital = item.satisfacaoMatHospital;
     _satisfacaoInstHospital = item.satisfacaoInstHospital;
@@ -219,45 +393,83 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
   RelatorioCirurgia _buildDraft() {
     return RelatorioCirurgia(
       nummov: widget.relatorio?.nummov ?? 0,
-      numrel: _parseIntField(_numrelController),
+      numrel: widget.relatorio?.numrel,
       nagecir: _parseIntField(_nagecirController),
       numreq: _parseIntField(_numreqController),
       datmov: _parseDateBr(_datmovController.text),
-      codpac: _codpac ?? _parseIntField(_codpacController),
-      codmed: _codmed ?? _parseIntField(_codmedController),
-      codconv: _codconv ?? _parseIntField(_codconvController),
-      codcli: _codcli ?? _parseIntField(_codcliController),
-      codins: _parseIntField(_codinsController),
-      inshos: _inshosController.text.trim().isEmpty ? null : _inshosController.text.trim(),
-      hrfin: _hrfinController.text.trim().isEmpty ? null : _hrfinController.text.trim(),
-      codcir: _parseIntField(_codcirController),
-      nomcir: _nomcirController.text.trim().isEmpty ? null : _nomcirController.text.trim(),
+      codpac: _codpac,
+      codmed: _codmed,
+      codconv: _codconv,
+      codcli: _codcli,
+      codins: _codins,
+      inshos: _inshosController.text.trim().isEmpty
+          ? null
+          : _inshosController.text.trim(),
+      hrfin: _hrfinController.text.trim().isEmpty
+          ? null
+          : _hrfinController.text.trim(),
+      codcir: _codcir,
+      nomcir: _nomcirController.text.trim().isEmpty
+          ? null
+          : _nomcirController.text.trim(),
       codlev: _parseIntField(_codlevController),
-      sistema: _sistemaController.text.trim().isEmpty ? null : _sistemaController.text.trim(),
+      sistema: _sistemaController.text.trim().isEmpty
+          ? null
+          : _sistemaController.text.trim(),
       idade: _parseIntField(_idadeController),
-      cirhos: _cirhosController.text.trim().isEmpty ? null : _cirhosController.text.trim(),
+      cirhos: _cirhosController.text.trim().isEmpty
+          ? null
+          : _cirhosController.text.trim(),
       codtro: _parseIntField(_codtroController),
-      circod: _circod ?? _parseIntField(_circodController),
+      circod: _circod,
       datcir: _parseDateBr(_datcirController.text),
-      hrini: _hriniController.text.trim().isEmpty ? null : _hriniController.text.trim(),
-      nprontuario: _nprontuarioController.text.trim().isEmpty ? null : _nprontuarioController.text.trim(),
-      grau: _grauController.text.trim().isEmpty ? null : _grauController.text.trim(),
-      historico: _historicoController.text.trim().isEmpty ? null : _historicoController.text.trim(),
-      obsEstoque: _obsEstoqueController.text.trim().isEmpty ? null : _obsEstoqueController.text.trim(),
-      obsGerencia: _obsGerenciaController.text.trim().isEmpty ? null : _obsGerenciaController.text.trim(),
-      obsRt: _obsRtController.text.trim().isEmpty ? null : _obsRtController.text.trim(),
-      problema: _problemaController.text.trim().isEmpty ? null : _problemaController.text.trim(),
-      problemaRetornoMat: _problemaRetornoController.text.trim().isEmpty ? null : _problemaRetornoController.text.trim(),
-      problemaImp: _problemaImpController.text.trim().isEmpty ? null : _problemaImpController.text.trim(),
-      medidaTomadaEstoque: _medidaEstoqueController.text.trim().isEmpty ? null : _medidaEstoqueController.text.trim(),
-      sistemaAplicado: _sistemaAplicadoController.text.trim().isEmpty ? null : _sistemaAplicadoController.text.trim(),
-      enderecoInicio: _enderecoInicioController.text.trim().isEmpty ? null : _enderecoInicioController.text.trim(),
-      enderecoFim: _enderecoFimController.text.trim().isEmpty ? null : _enderecoFimController.text.trim(),
+      hrini: _hriniController.text.trim().isEmpty
+          ? null
+          : _hriniController.text.trim(),
+      nprontuario: _nprontuarioController.text.trim().isEmpty
+          ? null
+          : _nprontuarioController.text.trim(),
+      grau: _grauController.text.trim().isEmpty
+          ? null
+          : _grauController.text.trim(),
+      historico: _historicoController.text.trim().isEmpty
+          ? null
+          : _historicoController.text.trim(),
+      obsEstoque: _obsEstoqueController.text.trim().isEmpty
+          ? null
+          : _obsEstoqueController.text.trim(),
+      obsGerencia: _obsGerenciaController.text.trim().isEmpty
+          ? null
+          : _obsGerenciaController.text.trim(),
+      obsRt: _obsRtController.text.trim().isEmpty
+          ? null
+          : _obsRtController.text.trim(),
+      problema: _problemaController.text.trim().isEmpty
+          ? null
+          : _problemaController.text.trim(),
+      problemaRetornoMat: _problemaRetornoController.text.trim().isEmpty
+          ? null
+          : _problemaRetornoController.text.trim(),
+      problemaImp: _problemaImpController.text.trim().isEmpty
+          ? null
+          : _problemaImpController.text.trim(),
+      medidaTomadaEstoque: _medidaEstoqueController.text.trim().isEmpty
+          ? null
+          : _medidaEstoqueController.text.trim(),
+      sistemaAplicado: _sistemaAplicadoController.text.trim().isEmpty
+          ? null
+          : _sistemaAplicadoController.text.trim(),
+      enderecoInicio: _enderecoInicioController.text.trim().isEmpty
+          ? null
+          : _enderecoInicioController.text.trim(),
+      enderecoFim: _enderecoFimController.text.trim().isEmpty
+          ? null
+          : _enderecoFimController.text.trim(),
       lado: _lado,
-      priRev: _priRev,
+      priRev: RelatorioFieldLabels.displayToPriRev(_priRevDisplay),
       sexo: _sexo,
-      status: _status,
-      urgencia: _urgencia,
+      status: RelatorioFieldLabels.displayToSn(_statusDisplay),
+      urgencia: RelatorioFieldLabels.displayToSn(_urgenciaDisplay),
       relProb: _relProb,
       satisfacaoMatHospital: _satisfacaoMatHospital,
       satisfacaoInstHospital: _satisfacaoInstHospital,
@@ -268,18 +480,29 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
       cliNome: _cliNome,
       convNome: _convNome,
       tipoCirNome: _tipoCirNome,
+      usulan: widget.relatorio?.usulan,
+      usulanNome: _digitadoPorNome,
     );
   }
 
   Future<void> _save() async {
-    if (_codpac == null && _parseIntField(_codpacController) == null) {
+    if (_isReadOnly) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_blockMessage ?? 'Não é possível salvar.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (_codpac == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Informe o paciente.')),
       );
       setState(() => _tabIndex = 0);
       return;
     }
-    if (_codmed == null && _parseIntField(_codmedController) == null) {
+    if (_codmed == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Informe o médico.')),
       );
@@ -312,83 +535,78 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     }
   }
 
-  Future<void> _applyLookupSelection({
-    required EntityLookupSelection? selection,
-    required void Function(int? code, String? name) apply,
-    required TextEditingController controller,
-  }) async {
+  Future<void> _pickPaciente() async {
+    final EntityLookupSelection? selection =
+        await EntityLookupPicker.pickPaciente(context);
     if (selection == null) {
       return;
     }
     setState(() {
-      final int? code = int.tryParse(selection.code);
-      apply(code, selection.name);
-      controller.text = selection.code;
+      _codpac = int.tryParse(selection.code);
+      _pacNome = selection.name;
     });
-  }
-
-  Future<void> _pickPaciente() async {
-    final EntityLookupSelection? selection =
-        await EntityLookupPicker.pickPaciente(context);
-    await _applyLookupSelection(
-      selection: selection,
-      controller: _codpacController,
-      apply: (int? code, String? name) {
-        _codpac = code;
-        _pacNome = name;
-      },
-    );
   }
 
   Future<void> _pickMedico() async {
     final EntityLookupSelection? selection =
         await EntityLookupPicker.pickMedico(context);
-    await _applyLookupSelection(
-      selection: selection,
-      controller: _codmedController,
-      apply: (int? code, String? name) {
-        _codmed = code;
-        _medNome = name;
-      },
-    );
+    if (selection == null) {
+      return;
+    }
+    setState(() {
+      _codmed = int.tryParse(selection.code);
+      _medNome = selection.name;
+    });
   }
 
   Future<void> _pickHospital() async {
     final EntityLookupSelection? selection =
         await EntityLookupPicker.pickHospital(context);
-    await _applyLookupSelection(
-      selection: selection,
-      controller: _codcliController,
-      apply: (int? code, String? name) {
-        _codcli = code;
-        _cliNome = name;
-      },
-    );
+    if (selection == null) {
+      return;
+    }
+    setState(() {
+      _codcli = int.tryParse(selection.code);
+      _cliNome = selection.name;
+    });
   }
 
   Future<void> _pickConvenio() async {
     final EntityLookupSelection? selection =
         await EntityLookupPicker.pickConvenio(context);
-    await _applyLookupSelection(
-      selection: selection,
-      controller: _codconvController,
-      apply: (int? code, String? name) {
-        _codconv = code;
-        _convNome = name;
-      },
-    );
+    if (selection == null) {
+      return;
+    }
+    setState(() {
+      _codconv = int.tryParse(selection.code);
+      _convNome = selection.name;
+    });
   }
 
   Future<void> _pickTipoCirurgia() async {
     final EntityLookupSelection? selection =
         await EntityLookupPicker.pickTipoCirurgia(context);
-    await _applyLookupSelection(
-      selection: selection,
-      controller: _circodController,
-      apply: (int? code, String? name) {
-        _circod = code;
-        _tipoCirNome = name;
-      },
+    if (selection == null) {
+      return;
+    }
+    setState(() {
+      _circod = int.tryParse(selection.code);
+      _tipoCirNome = selection.name;
+    });
+  }
+
+  Widget _buildBlockBanner() {
+    if (_blockMessage == null || _canEdit) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      width: double.infinity,
+      color: Colors.red.shade50,
+      padding: const EdgeInsets.all(12),
+      child: Text(
+        _blockMessage!,
+        style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.w500),
+      ),
     );
   }
 
@@ -396,14 +614,45 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        _field('No Relatorio', _numrelController),
-        _field('No Agenda', _nagecirController),
+        FormSectionField(
+          label: 'No Agenda',
+          controller: _nagecirController,
+          readOnly: _isReadOnly,
+          keyboardType: TextInputType.number,
+          onSearch: _isReadOnly ? null : _loadFromAgenda,
+          actionIcon: Icons.download_outlined,
+        ),
+        if (_isLoadingAgenda)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: LinearProgressIndicator(),
+          ),
         _field('No Ropme', _numreqController),
         _field('Data Emissao', _datmovController),
-        _lookupField('Paciente *', _codpacController, _pacNome, _pickPaciente),
-        _lookupField('Medico *', _codmedController, _medNome, _pickMedico),
-        _lookupField('Convenio', _codconvController, _convNome, _pickConvenio),
-        _lookupField('Local Cirurgia', _codcliController, _cliNome, _pickHospital),
+        FormSectionLookup(
+          label: 'Paciente *',
+          value: _pacNome,
+          onSearch: _isReadOnly ? null : _pickPaciente,
+          readOnly: _isReadOnly,
+        ),
+        FormSectionLookup(
+          label: 'Medico *',
+          value: _medNome,
+          onSearch: _isReadOnly ? null : _pickMedico,
+          readOnly: _isReadOnly,
+        ),
+        FormSectionLookup(
+          label: 'Convenio',
+          value: _convNome,
+          onSearch: _isReadOnly ? null : _pickConvenio,
+          readOnly: _isReadOnly,
+        ),
+        FormSectionLookup(
+          label: 'Local Cirurgia',
+          value: _cliNome,
+          onSearch: _isReadOnly ? null : _pickHospital,
+          readOnly: _isReadOnly,
+        ),
       ],
     );
   }
@@ -412,28 +661,105 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        _field('Cod Instr', _codinsController),
+        _field('Instrumentador', _nomeInstrController),
+        _dateField('Data Cirurgia *', _datcirController),
+        _timeField('Inicio', _hriniController),
+        _timeField('Fim', _hrfinController),
         _field('Instrumentador Hospital', _inshosController),
-        _field('Fim', _hrfinController),
-        _field('Cod Circulante', _codcirController),
-        _field('Nome Circulante', _nomcirController),
-        _field('Cod Levou', _codlevController),
-        _field('Sistema', _sistemaController),
-        _field('No Req', _numreqController),
-        _field('Idade', _idadeController),
+        _dropdown('Lado', _lado, <String>['D', 'E', 'A'],
+            (String? v) => setState(() => _lado = v)),
+        _priRevDropdown(),
+        _field('Circulante', _nomcirController),
         _field('Circulante Hospital', _cirhosController),
-        _dropdown('Rel Concluido', _status, <String>['S', 'N'], (String? v) => setState(() => _status = v)),
-        _dropdown('Urgencia', _urgencia, <String>['S', 'N'], (String? v) => setState(() => _urgencia = v)),
-        _field('Data Cirurgia *', _datcirController),
-        _dropdown('Lado', _lado, <String>['D', 'E', 'A'], (String? v) => setState(() => _lado = v)),
+        _dropdown('Sexo', _sexo, <String>['M', 'F'],
+            (String? v) => setState(() => _sexo = v)),
+        FormSectionField(
+          label: 'Digitado por',
+          controller: _digitadoPorController,
+          readOnly: true,
+        ),
+        _field('Idade', _idadeController),
         _field('Grau', _grauController),
-        _field('Cod Trouxe', _codtroController),
-        _lookupField('Tipo Cirurgia', _circodController, _tipoCirNome, _pickTipoCirurgia),
-        _field('Inicio', _hriniController),
-        _dropdown('Primaria/Revisao', _priRev, <String>['P', 'R'], (String? v) => setState(() => _priRev = v)),
-        _dropdown('Sexo', _sexo, <String>['M', 'F'], (String? v) => setState(() => _sexo = v)),
         _field('No Prontuario', _nprontuarioController),
+        _field('Cod Levou', _codlevController),
+        _field('Cod Trouxe', _codtroController),
+        _field('Sistema', _sistemaController),
+        _simNaoDropdown(
+          'Rel Concluido',
+          _statusDisplay,
+          (String? v) => setState(() => _statusDisplay = v),
+        ),
+        FormSectionLookup(
+          label: 'Tipo Cirurgia',
+          value: _tipoCirNome,
+          onSearch: _isReadOnly ? null : _pickTipoCirurgia,
+          readOnly: _isReadOnly,
+        ),
+        _field('No Req', _numreqController),
+        _simNaoDropdown(
+          'Urgencia',
+          _urgenciaDisplay,
+          (String? v) => setState(() => _urgenciaDisplay = v),
+        ),
       ],
+    );
+  }
+
+  Widget _dateField(String label, TextEditingController controller) {
+    return FormSectionField(
+      label: label,
+      controller: controller,
+      readOnly: true,
+      onSearch: _isReadOnly ? null : () => _pickDate(controller),
+      actionIcon: Icons.calendar_today,
+    );
+  }
+
+  Widget _timeField(String label, TextEditingController controller) {
+    return FormSectionField(
+      label: label,
+      controller: controller,
+      readOnly: true,
+      onSearch: _isReadOnly ? null : () => _pickTime(controller),
+      actionIcon: Icons.access_time,
+    );
+  }
+
+  Widget _simNaoDropdown(
+    String label,
+    String? value,
+    ValueChanged<String?> onChanged,
+  ) {
+    return FormSectionDropdown<String?>(
+      label: label,
+      value: value,
+      items: const <DropdownMenuItem<String?>>[
+        DropdownMenuItem<String?>(value: null, child: Text('')),
+        DropdownMenuItem<String?>(value: 'Sim', child: Text('Sim')),
+        DropdownMenuItem<String?>(value: 'Não', child: Text('Não')),
+      ],
+      onChanged: onChanged,
+      readOnly: _isReadOnly,
+    );
+  }
+
+  Widget _priRevDropdown() {
+    return FormSectionDropdown<String?>(
+      label: 'Primaria/Revisao',
+      value: _priRevDisplay,
+      items: const <DropdownMenuItem<String?>>[
+        DropdownMenuItem<String?>(value: null, child: Text('')),
+        DropdownMenuItem<String?>(
+          value: 'Primaria',
+          child: Text('Primaria'),
+        ),
+        DropdownMenuItem<String?>(
+          value: 'Revisao',
+          child: Text('Revisao'),
+        ),
+      ],
+      onChanged: (String? v) => setState(() => _priRevDisplay = v),
+      readOnly: _isReadOnly,
     );
   }
 
@@ -441,13 +767,19 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        const Text('Avaliacao do Hospital', style: TextStyle(fontWeight: FontWeight.bold)),
-        _satisfacaoDropdown('Nivel Sat C/ Material', _satisfacaoMatHospital, (String? v) => setState(() => _satisfacaoMatHospital = v)),
-        _satisfacaoDropdown('Nivel Sat C/ Instrum', _satisfacaoInstHospital, (String? v) => setState(() => _satisfacaoInstHospital = v)),
+        const Text('Avaliacao do Hospital',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        _satisfacaoDropdown('Nivel Sat C/ Material', _satisfacaoMatHospital,
+            (String? v) => setState(() => _satisfacaoMatHospital = v)),
+        _satisfacaoDropdown('Nivel Sat C/ Instrum', _satisfacaoInstHospital,
+            (String? v) => setState(() => _satisfacaoInstHospital = v)),
         const SizedBox(height: 16),
-        const Text('Avaliacao do Cirurgiao', style: TextStyle(fontWeight: FontWeight.bold)),
-        _satisfacaoDropdown('Nivel Sat C/ Material', _satisfacaoMatCirurg, (String? v) => setState(() => _satisfacaoMatCirurg = v)),
-        _satisfacaoDropdown('Nivel Sat C/ Instrum', _satisfacaoInstCirurg, (String? v) => setState(() => _satisfacaoInstCirurg = v)),
+        const Text('Avaliacao do Cirurgiao',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        _satisfacaoDropdown('Nivel Sat C/ Material', _satisfacaoMatCirurg,
+            (String? v) => setState(() => _satisfacaoMatCirurg = v)),
+        _satisfacaoDropdown('Nivel Sat C/ Instrum', _satisfacaoInstCirurg,
+            (String? v) => setState(() => _satisfacaoInstCirurg = v)),
       ],
     );
   }
@@ -470,7 +802,8 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
       padding: const EdgeInsets.all(16),
       children: <Widget>[
         _multiline('Problema Cirurgia', _problemaController),
-        _dropdown('Problema Cirurgia (flag)', _relProb, <String>['S', 'N'], (String? v) => setState(() => _relProb = v)),
+        _dropdown('Problema Cirurgia (flag)', _relProb, <String>['S', 'N'],
+            (String? v) => setState(() => _relProb = v)),
         _multiline('Problema retorno material', _problemaRetornoController),
         _multiline('Problema imp', _problemaImpController),
         _field('Medida tomada estoque', _medidaEstoqueController),
@@ -484,6 +817,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return FormSectionField(
       label: label,
       controller: controller,
+      readOnly: _isReadOnly,
     );
   }
 
@@ -492,6 +826,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
       label: label,
       controller: controller,
       maxLines: 8,
+      readOnly: _isReadOnly,
     );
   }
 
@@ -500,21 +835,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
       label: label,
       controller: controller,
       maxLines: 8,
-    );
-  }
-
-  Widget _lookupField(
-    String label,
-    TextEditingController controller,
-    String? nome,
-    VoidCallback onSearch,
-  ) {
-    return FormSectionField(
-      label: label,
-      controller: controller,
-      subtitle: nome,
-      onSearch: onSearch,
-      keyboardType: TextInputType.number,
+      readOnly: _isReadOnly,
     );
   }
 
@@ -524,18 +845,19 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     List<String> options,
     ValueChanged<String?> onChanged,
   ) {
-    return FormSectionDropdown<String>(
+    return FormSectionDropdown<String?>(
       label: label,
-      value: value ?? options.first,
+      value: value,
       items: options
           .map(
-            (String option) => DropdownMenuItem<String>(
+            (String option) => DropdownMenuItem<String?>(
               value: option,
               child: Text(option),
             ),
           )
           .toList(),
       onChanged: onChanged,
+      readOnly: _isReadOnly,
     );
   }
 
@@ -556,6 +878,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
           )
           .toList(),
       onChanged: onChanged,
+      readOnly: _isReadOnly,
     );
   }
 
@@ -573,23 +896,33 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               ),
             )
-          else
+          else if (!_isReadOnly)
             IconButton(onPressed: _save, icon: const Icon(Icons.save)),
         ],
       ),
       body: Form(
         key: _formKey,
-        child: IndexedStack(
-          index: _tabIndex,
+        child: Column(
           children: <Widget>[
-            _buildCadastroTab(),
-            _buildOutrosTab(),
-            _buildAvaliacaoTab(),
-            _buildObservacaoTab(),
-            _buildMaisTab(),
+            _buildBlockBanner(),
+            Expanded(
+              child: IndexedStack(
+                index: _tabIndex,
+                children: <Widget>[
+                  _buildCadastroTab(),
+                  _buildOutrosTab(),
+                  _buildAvaliacaoTab(),
+                  _buildObservacaoTab(),
+                  _buildMaisTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -597,10 +930,14 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
         selectedIndex: _tabIndex,
         onDestinationSelected: (int index) => setState(() => _tabIndex = index),
         destinations: const <NavigationDestination>[
-          NavigationDestination(icon: Icon(Icons.description_outlined), label: 'Cadastro'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Outros'),
-          NavigationDestination(icon: Icon(Icons.fact_check_outlined), label: 'Avaliacao'),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'Observacao'),
+          NavigationDestination(
+              icon: Icon(Icons.description_outlined), label: 'Cadastro'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline), label: 'Outros'),
+          NavigationDestination(
+              icon: Icon(Icons.fact_check_outlined), label: 'Avaliacao'),
+          NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline), label: 'Observacao'),
           NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mais'),
         ],
       ),

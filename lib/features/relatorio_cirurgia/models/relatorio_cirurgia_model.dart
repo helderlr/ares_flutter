@@ -1,3 +1,33 @@
+import '../../../core/permissions/user_permissions.dart';
+
+enum RelatorioVisualStatus {
+  contaContaminado,
+  comProblema,
+  semProblema,
+}
+
+class RelatorioAccess {
+  final bool canEdit;
+  final bool canDelete;
+  final bool isConcluido;
+  final bool isOtherUser;
+  final String? blockReason;
+  final String? otherUserMessage;
+  final String? concluidoMessage;
+
+  const RelatorioAccess({
+    required this.canEdit,
+    this.canDelete = false,
+    this.isConcluido = false,
+    this.isOtherUser = false,
+    this.blockReason,
+    this.otherUserMessage,
+    this.concluidoMessage,
+  });
+
+  bool get hasAnyAction => canEdit || canDelete;
+}
+
 class RelatorioCirurgia {
   final int nummov;
   final String? historico;
@@ -56,6 +86,7 @@ class RelatorioCirurgia {
   final String? cliNome;
   final String? convNome;
   final String? tipoCirNome;
+  final String? usulanNome;
   final String? enderecoInicio;
   final String? enderecoFim;
   final String? deviceId;
@@ -118,6 +149,7 @@ class RelatorioCirurgia {
     this.cliNome,
     this.convNome,
     this.tipoCirNome,
+    this.usulanNome,
     this.enderecoInicio,
     this.enderecoFim,
     this.deviceId,
@@ -130,6 +162,80 @@ class RelatorioCirurgia {
   String get convenioName => convNome ?? 'Convênio não informado';
   String get dataCirurgiaDisplay => _formatDate(datcir);
   String get dataEmissaoDisplay => _formatDate(datmov);
+
+  bool get isConcluido => status?.toUpperCase() == 'S';
+
+  bool get isContaContaminado {
+    final String? value = relConta?.trim().toUpperCase();
+    return value == 'S' || value == '1';
+  }
+
+  RelatorioVisualStatus get visualStatus {
+    if (isContaContaminado) {
+      return RelatorioVisualStatus.contaContaminado;
+    }
+    if (relProb?.toUpperCase() == 'S') {
+      return RelatorioVisualStatus.comProblema;
+    }
+    return RelatorioVisualStatus.semProblema;
+  }
+
+  bool isDigitadoPorOutroUsuario(int? loggedCodusu) {
+    if (loggedCodusu == null || usulan == null) {
+      return false;
+    }
+    return usulan != loggedCodusu;
+  }
+
+  String get digitadorLabel {
+    final String nome = usulanNome?.trim() ?? '';
+    if (nome.isNotEmpty && usulan != null) {
+      return '$nome (cód. $usulan)';
+    }
+    if (usulan != null) {
+      return 'cód. $usulan';
+    }
+    return nome;
+  }
+
+  RelatorioAccess evaluateAccess(UserPermissions user) {
+    if (isConcluido) {
+      return RelatorioAccess(
+        canEdit: false,
+        canDelete: user.isAdmin,
+        isConcluido: true,
+        concluidoMessage: 'Relatório já foi concluído, não pode editar.',
+        blockReason: 'Relatório já foi concluído, não pode editar.',
+      );
+    }
+    final bool isOtherUser = isDigitadoPorOutroUsuario(user.codusu);
+    if (isOtherUser && !user.isAdmin) {
+      final String message =
+          'Este relatório cirurgia foi digitado pelo usuário $digitadorLabel';
+      return RelatorioAccess(
+        canEdit: false,
+        canDelete: false,
+        isOtherUser: true,
+        otherUserMessage: message,
+        blockReason: '$message e não pode ser editado.',
+      );
+    }
+    if (!user.canPerformEdits) {
+      return const RelatorioAccess(
+        canEdit: false,
+        canDelete: false,
+        blockReason: 'Usuário inativo. Não é possível editar.',
+      );
+    }
+    final bool owner = user.codusu != null &&
+        usulan != null &&
+        user.codusu == usulan;
+    final bool canModify = owner || user.isAdmin;
+    return RelatorioAccess(
+      canEdit: canModify,
+      canDelete: canModify,
+    );
+  }
 
   static String _formatDate(DateTime? value) {
     if (value == null) {
@@ -244,6 +350,7 @@ class RelatorioCirurgia {
       cliNome: _parseString(json['cli_nome']),
       convNome: _parseString(json['conv_nome']),
       tipoCirNome: _parseString(json['tipo_cir_nome']),
+      usulanNome: _parseString(json['usulan_nome'] ?? json['usu_nome']),
       enderecoInicio: _parseString(json['endereco_inicio']),
       enderecoFim: _parseString(json['endereco_fim']),
       deviceId: _parseString(json['device_id']),
