@@ -506,10 +506,11 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        _multiline('Observacao', _historicoController),
-        _multiline('Obs Estoque', _obsEstoqueController),
-        _multiline('Obs Gerencia', _obsGerenciaController),
-        _multiline('Obs RT', _obsRtController),
+        _multilineSection('Observacao', _historicoController),
+        _multilineSection('Material da Cirurgia', _sistemaAplicadoController),
+        _multilineSection('Obs Estoque', _obsEstoqueController),
+        _multilineSection('Obs Gerencia', _obsGerenciaController),
+        _multilineSection('Obs RT', _obsRtController),
       ],
     );
   }
@@ -523,7 +524,6 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
         _multiline('Problema retorno material', _problemaRetornoController),
         _multiline('Problema imp', _problemaImpController),
         _field('Medida tomada estoque', _medidaEstoqueController),
-        _multiline('Sistema aplicado', _sistemaAplicadoController),
         _field('Endereco inicio', _enderecoInicioController),
         _field('Endereco fim', _enderecoFimController),
       ],
@@ -555,6 +555,35 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
           border: const OutlineInputBorder(),
           alignLabelWithHint: true,
         ),
+      ),
+    );
+  }
+
+  Widget _multilineSection(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            minLines: 4,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
       ),
     );
   }
