@@ -20,7 +20,6 @@ import '../../atendimento/presentation/atendimento_graficos_page.dart';
 import '../../atendimento/presentation/atendimento_cirurgia_diaria_page.dart';
 import '../../atendimento/presentation/atendimento_cirurgia_mapa_page.dart';
 import '../../atendimento/presentation/atendimento_relatorios_page.dart';
-import '../../atendimento/presentation/atendimento_rel_cirurgia_page.dart';
 import '../../relatorio_cirurgia/presentation/relatorio_cirurgia_page.dart';
 import '../../atendimento/presentation/atendimento_rota_inteligente_page.dart';
 import '../../atendimento/presentation/atendimento_escala_page.dart';
@@ -144,24 +143,13 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       _HomeMenuItem(
-        title: 'Relatorio de Cirurgia',
-        subtitle: 'Cadastro e consulta',
+        title: 'Relatorio Cirurgia',
+        subtitle: 'Rel qualidade',
         icon: Icons.assignment_turned_in,
         color: Colors.brown,
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const RelatorioCirurgiaPage(),
-          ),
-        ),
-      ),
-      _HomeMenuItem(
-        title: 'Rel Agenda',
-        subtitle: 'Mapa por data',
-        icon: Icons.map_outlined,
-        color: Colors.brown.shade300,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const AtendimentoRelCirurgiaPage(),
           ),
         ),
       ),
@@ -355,8 +343,7 @@ class _HomePageState extends State<HomePage> {
       MenuOption(title: 'Gráficos', icon: Icons.show_chart),
       MenuOption(title: 'Cirurgia mapa', icon: Icons.map),
       MenuOption(title: 'Cirurgia diária', icon: Icons.calendar_month),
-      MenuOption(title: 'Relatorio de Cirurgia', icon: Icons.assignment_turned_in),
-      MenuOption(title: 'Rel Agenda', icon: Icons.map_outlined),
+      MenuOption(title: 'Relatorio Cirurgia', icon: Icons.assignment_turned_in),
       MenuOption(title: 'Rota inteligente', icon: Icons.route),
       MenuOption(title: 'Escala', icon: Icons.swap_vert),
       MenuOption(title: 'Agenda visita', icon: Icons.event_note),
@@ -486,18 +473,10 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
-    if (title == 'Relatorio de Cirurgia') {
+    if (title == 'Relatorio Cirurgia') {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const RelatorioCirurgiaPage(),
-        ),
-      );
-      return;
-    }
-    if (title == 'Rel Agenda' || title == 'Rel. cirurgia') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const AtendimentoRelCirurgiaPage(),
         ),
       );
       return;

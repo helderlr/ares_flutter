@@ -13,6 +13,12 @@ class AgendaFilterDialog {
     );
   }
 
+  static InputDecoration _searchDecoration(String label) {
+    return _decoration(label).copyWith(
+      suffixIcon: const Icon(Icons.search),
+    );
+  }
+
   static DateTime _clampDate(
     DateTime value,
     DateTime minDate,
@@ -168,7 +174,7 @@ class AgendaFilterDialog {
                     const SizedBox(height: 12),
                     TextField(
                       controller: pacienteController,
-                      decoration: _decoration('Paciente'),
+                      decoration: _searchDecoration('Paciente'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -179,32 +185,32 @@ class AgendaFilterDialog {
                     const SizedBox(height: 12),
                     TextField(
                       controller: medicoController,
-                      decoration: _decoration('Médico'),
+                      decoration: _searchDecoration('Médico'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: convenioController,
-                      decoration: _decoration('Convênio'),
+                      decoration: _searchDecoration('Convênio'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: hospitalController,
-                      decoration: _decoration('Hospital'),
+                      decoration: _searchDecoration('Hospital'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: tipoCirurgiaController,
-                      decoration: _decoration('Tipo de Cirurgia'),
+                      decoration: _searchDecoration('Tipo de Cirurgia'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: instrumentadorController,
-                      decoration: _decoration('Instrumentador'),
+                      decoration: _searchDecoration('Instrumentador'),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: vendedorController,
-                      decoration: _decoration('Vendedor'),
+                      decoration: _searchDecoration('Vendedor'),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<AgendaTipmarFilter>(
@@ -424,7 +430,11 @@ class AgendaFilterDialog {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (requireDateRange && (dateFrom == null || dateTo == null)) {
+                    final bool hasAgendaNumber =
+                        _trimOrNull(nummovController.text) != null;
+                    if (requireDateRange &&
+                        !hasAgendaNumber &&
+                        (dateFrom == null || dateTo == null)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Informe o período (data início e fim).'),

@@ -13,6 +13,12 @@ class RelatorioFilterDialog {
     );
   }
 
+  static InputDecoration _searchDecoration(String label) {
+    return _decoration(label).copyWith(
+      suffixIcon: const Icon(Icons.search),
+    );
+  }
+
   static String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
@@ -114,22 +120,26 @@ class RelatorioFilterDialog {
                     children: <Widget>[
                       TextField(
                         controller: hospitalController,
-                        decoration: _decoration('Cod Loc Cir'),
+                        decoration: _searchDecoration('Cod Loc Cir'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: medicoController,
-                        decoration: _decoration('Cod Medico'),
+                        decoration: _searchDecoration('Cod Medico'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: convenioController,
-                        decoration: _decoration('Cod Convenio'),
+                        decoration: _searchDecoration('Cod Convenio'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: pacienteController,
-                        decoration: _decoration('Cod Paciente'),
+                        decoration: _searchDecoration('Cod Paciente'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       _triDropdown(
@@ -161,7 +171,7 @@ class RelatorioFilterDialog {
                       const SizedBox(height: 10),
                       TextField(
                         controller: digitadoController,
-                        decoration: _decoration('Digitado por'),
+                        decoration: _searchDecoration('Digitado por'),
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<RelatorioLadoFilter>(
@@ -194,12 +204,13 @@ class RelatorioFilterDialog {
                       const SizedBox(height: 10),
                       TextField(
                         controller: tipoController,
-                        decoration: _decoration('Tipo'),
+                        decoration: _searchDecoration('Tipo'),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: codcirController,
-                        decoration: _decoration('Cod Circulante'),
+                        decoration: _searchDecoration('Cod Circulante'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton(
@@ -243,6 +254,7 @@ class RelatorioFilterDialog {
                       TextField(
                         controller: numrelController,
                         decoration: _decoration('No Rel'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<RelatorioSexoFilter>(
@@ -285,12 +297,13 @@ class RelatorioFilterDialog {
                       const SizedBox(height: 10),
                       TextField(
                         controller: codinsController,
-                        decoration: _decoration('Cod Inst'),
+                        decoration: _searchDecoration('Cod Inst'),
+                        keyboardType: TextInputType.number,
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: produtoController,
-                        decoration: _decoration('Cod Produto'),
+                        decoration: _searchDecoration('Cod Produto'),
                       ),
                       const SizedBox(height: 10),
                       _triDropdown(
@@ -303,6 +316,7 @@ class RelatorioFilterDialog {
                       TextField(
                         controller: nagecirController,
                         decoration: _decoration('No Agenda'),
+                        keyboardType: TextInputType.number,
                       ),
                     ],
                   ),
