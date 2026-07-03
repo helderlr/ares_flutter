@@ -4,9 +4,16 @@ class ApiErrorFormatter {
     if (message.startsWith('Exception: ')) {
       message = message.substring('Exception: '.length);
     }
+    final String lower = message.toLowerCase();
+    if (lower.contains('token ausente') ||
+        lower.contains('token jwt') ||
+        lower.contains('token não encontrado')) {
+      return 'Sessão sem token. Saia do app e faça login novamente.';
+    }
     if (message.contains('<!DOCTYPE html>') || message.contains('<html')) {
       if (message.contains('404')) {
-        return 'Serviço não encontrado (404). O endpoint da API pode não estar disponível.';
+        return 'Endpoint não encontrado (404). Faça login novamente ou '
+            'verifique se a API cartao-protese foi deployada no servidor.';
       }
       if (message.contains('502')) {
         return 'Servidor temporariamente indisponível (502).';

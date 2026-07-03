@@ -329,6 +329,7 @@ class AuthService {
       return {
         ...headers,
         'Authorization': 'Bearer $token',
+        'Cookie': 'aresia_token=$token',
       };
     }
     return headers;

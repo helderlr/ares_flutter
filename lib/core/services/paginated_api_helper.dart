@@ -92,6 +92,10 @@ class PaginatedApiHelper {
         throw const UnauthorizedException();
       }
       if (httpResponse.statusCode != 200) {
+        final String? apiError = _tryParseApiError(responseBody);
+        if (apiError != null) {
+          throw Exception(apiError);
+        }
         throw Exception(
           'Erro na API: ${httpResponse.statusCode} - $responseBody',
         );
@@ -125,6 +129,22 @@ class PaginatedApiHelper {
             ? decoded['pagination'] as Map<String, dynamic>
             : <String, dynamic>{};
     return PaginatedApiDecoded(data: rows, pagination: pagination);
+  }
+
+  static String? _tryParseApiError(String body) {
+    if (body.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final dynamic decoded = json.decode(body);
+      if (decoded is Map<String, dynamic>) {
+        final String? error = decoded['error']?.toString();
+        if (error != null && error.isNotEmpty) {
+          return error;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   static String formatIsoDate(DateTime date) {

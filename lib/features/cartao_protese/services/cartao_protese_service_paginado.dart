@@ -28,8 +28,6 @@ class CartaoProteseServicePaginado {
       final Map<String, String> queryParams = PaginatedApiHelper.buildListQuery(
         page: page,
         pageSize: pageSize,
-        sortBy: 'date',
-        sortOrder: 'desc',
         search: searchQuery?.trim().isNotEmpty == true
             ? searchQuery!.trim()
             : null,

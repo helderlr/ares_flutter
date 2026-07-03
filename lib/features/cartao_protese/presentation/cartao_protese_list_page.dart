@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/screen_capture_service.dart';
+import '../../../core/services/unauthorized_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/share_format_sheet.dart';
@@ -80,12 +81,29 @@ class _CartaoProteseListPageState extends State<CartaoProteseListPage> {
     }
   }
 
+  Future<void> _relogin() async {
+    await AuthService.handleSessionExpired();
+  }
+
   Future<void> _loadFirstPage() async {
     setState(() {
       _isLoading = true;
       _hasError = false;
       _itens.clear();
     });
+    final String? token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasError = true;
+        _errorMessage =
+            'Sessão sem token JWT. Saia e entre novamente para autenticar.';
+        _isLoading = false;
+      });
+      return;
+    }
     try {
       final CartaoProtesePaginatedResponse response =
           await _service.fetchPaginated(
@@ -100,6 +118,15 @@ class _CartaoProteseListPageState extends State<CartaoProteseListPage> {
       setState(() {
         _itens.addAll(response.itens);
         _paginationInfo = response.pagination;
+        _isLoading = false;
+      });
+    } on UnauthorizedException {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'Sessão expirada. Faça login novamente.';
         _isLoading = false;
       });
     } catch (error) {
@@ -344,6 +371,11 @@ class _CartaoProteseListPageState extends State<CartaoProteseListPage> {
               ElevatedButton(
                 onPressed: _loadFirstPage,
                 child: const Text('Tentar novamente'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _relogin,
+                child: const Text('Sair e fazer login novamente'),
               ),
             ],
           ),
