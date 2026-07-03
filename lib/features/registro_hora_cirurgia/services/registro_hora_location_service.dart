@@ -1,3 +1,4 @@
+import '../../../core/utils/address_text_helper.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -55,14 +56,14 @@ class RegistroHoraLocationService {
         return _formatCoordinates(location);
       }
       final Placemark place = placemarks.first;
-      final List<String> parts = <String>[
-        place.street ?? '',
-        place.subLocality ?? '',
-        place.locality ?? '',
-        place.administrativeArea ?? '',
-      ].where((String part) => part.trim().isNotEmpty).toList();
-      if (parts.isNotEmpty) {
-        return parts.join(', ');
+      final String address = AddressTextHelper.formatPlacemarkPart(
+        street: place.street,
+        subLocality: place.subLocality,
+        locality: place.locality,
+        administrativeArea: place.administrativeArea,
+      );
+      if (address.isNotEmpty) {
+        return address;
       }
       return _formatCoordinates(location);
     } catch (_) {

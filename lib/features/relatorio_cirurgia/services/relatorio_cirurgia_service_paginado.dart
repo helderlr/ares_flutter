@@ -95,6 +95,24 @@ class RelatorioCirurgiaServicePaginado {
     return allItems;
   }
 
+  Future<RelatorioCirurgia?> findByNagecir(
+    int nagecir, {
+    int? excludeNummov,
+  }) async {
+    final RelatorioCirurgiaPaginatedResponse response = await fetchPaginated(
+      page: 1,
+      pageSize: 50,
+      filters: RelatorioListFilters(nagecirQuery: nagecir.toString()),
+    );
+    for (final RelatorioCirurgia item in response.itens) {
+      if (item.nagecir == nagecir &&
+          (excludeNummov == null || item.nummov != excludeNummov)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
   Map<String, String> _buildFilterExtra(RelatorioListFilters? filters) {
     final Map<String, String> extra = <String, String>{};
     if (filters == null) {

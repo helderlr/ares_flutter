@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:barcode/barcode.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdf/pdf.dart';
@@ -25,12 +26,6 @@ class RelatorioCirurgiaPdfService {
     final DateTime now = DateTime.now();
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final String userName = usuario?.nome ?? 'Usuario';
-    final String periodFrom = filters.dateFrom != null
-        ? dateFmt.format(filters.dateFrom!)
-        : dateFmt.format(now);
-    final String periodTo = filters.dateTo != null
-        ? dateFmt.format(filters.dateTo!)
-        : dateFmt.format(now);
     final List<RelatorioCirurgia> sorted = List<RelatorioCirurgia>.from(items)
       ..sort((RelatorioCirurgia a, RelatorioCirurgia b) {
         final DateTime? da = a.datcir;
@@ -85,11 +80,6 @@ class RelatorioCirurgiaPdfService {
               _sectionBox(
                 'Resolucao do Problema',
                 item.medidaTomadaEstoque ?? '',
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                'Periodo: $periodFrom a $periodTo',
-                style: const pw.TextStyle(fontSize: 7),
               ),
             ];
           },
@@ -181,6 +171,16 @@ class RelatorioCirurgiaPdfService {
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
+                  pw.SizedBox(height: 4),
+                  pw.Center(
+                    child: pw.BarcodeWidget(
+                      barcode: Barcode.code128(),
+                      data: _barcodeData(item),
+                      drawText: true,
+                      width: 140,
+                      height: 36,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -191,23 +191,11 @@ class RelatorioCirurgiaPdfService {
                   pw.Container(
                     width: 72,
                     height: 36,
-                    margin: const pw.EdgeInsets.only(bottom: 4),
                     child: pw.Image(
                       pw.MemoryImage(logoBytes),
                       fit: pw.BoxFit.contain,
                     ),
                   ),
-                pw.SizedBox(
-                  width: 120,
-                  child: pw.Text(
-                    empresa.displayNome,
-                    textAlign: pw.TextAlign.right,
-                    style: pw.TextStyle(
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
               ],
             ),
           ],
@@ -216,6 +204,11 @@ class RelatorioCirurgiaPdfService {
         pw.Divider(thickness: 0.5),
       ],
     );
+  }
+
+  String _barcodeData(RelatorioCirurgia item) {
+    final int? numero = item.numrel ?? item.nummov;
+    return numero.toString();
   }
 
   pw.Widget _buildFooter({

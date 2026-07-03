@@ -34,16 +34,19 @@ class RegistroHoraService {
     required RegistroHoraCampo campo,
     required DateTime hora,
     RegistroHoraLocationCapture? localizacao,
+    int? codins,
   }) async {
     final String horaTexto =
         '${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}';
     final MobileDeviceSnapshot device = await MobileDeviceContext.collect();
+    final int? codinsToSave = item.codins ?? codins;
     final RelatorioCirurgia payload;
     if (campo == RegistroHoraCampo.inicio) {
       payload = RelatorioCirurgia(
         nummov: item.nummov,
         dtHoraInicio: hora,
         hrini: horaTexto,
+        codins: codinsToSave,
         latitudeInicio: localizacao?.position.latitude,
         longitudeInicio: localizacao?.position.longitude,
         precisaoInicio: localizacao?.accuracyMeters,
@@ -55,6 +58,7 @@ class RegistroHoraService {
         nummov: item.nummov,
         dtHoraFim: hora,
         hrfin: horaTexto,
+        codins: codinsToSave,
         latitudeFim: localizacao?.position.latitude,
         longitudeFim: localizacao?.position.longitude,
         precisaoFim: localizacao?.accuracyMeters,

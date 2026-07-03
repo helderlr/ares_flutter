@@ -1,14 +1,26 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/services/screen_capture_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/protected_ui.dart';
+import '../../../core/widgets/share_format_sheet.dart';
+import '../../login/models/user_model.dart';
+import '../../login/services/auth_service.dart';
 import '../../relatorio_cirurgia/models/relatorio_cirurgia_model.dart';
 import '../../relatorio_cirurgia/models/relatorio_list_filters.dart';
 import '../../relatorio_cirurgia/services/relatorio_cirurgia_service_paginado.dart';
 import '../../relatorio_cirurgia/services/relatorio_cirurgia_service.dart';
+import '../../relatorio_cirurgia/services/relatorio_filter_state.dart';
+import '../models/registro_hora_list_filters.dart';
+import '../models/registro_hora_situacao_filter.dart';
+import '../widgets/registro_hora_filter_dialog.dart';
 import '../services/registro_hora_location_service.dart';
 import '../services/registro_hora_service.dart';
+import '../services/registro_hora_lista_pdf_service.dart';
+import '../../relatorio_cirurgia/services/relatorio_tipo_cirurgia_enrichment_service.dart';
 import 'registro_hora_mapa_page.dart';
 
 class RegistroHoraCirurgiaPage extends StatefulWidget {
@@ -35,15 +47,35 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
   final RelatorioCirurgiaService _relatorioService = RelatorioCirurgiaService();
   final RelatorioCirurgiaServicePaginado _listService =
       RelatorioCirurgiaServicePaginado();
+  final RegistroHoraListaPdfService _pdfService = RegistroHoraListaPdfService();
+  final RelatorioTipoCirurgiaEnrichmentService _enrichmentService =
+      RelatorioTipoCirurgiaEnrichmentService();
+  final GlobalKey _shareKey = GlobalKey();
   final List<RelatorioCirurgia> _itens = <RelatorioCirurgia>[];
+  RegistroHoraListFilters _filters = const RegistroHoraListFilters();
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isSharing = false;
   String? _errorMessage;
+  int? _loggedCodins;
+
+  bool get _canEditHorarios => widget.isSingleRelatorio;
+
+  bool get _filtersActive => _filters.hasActiveFilters;
 
   @override
   void initState() {
     super.initState();
+    _loadLoggedCodins();
     _loadItens();
+  }
+
+  Future<void> _loadLoggedCodins() async {
+    final int? codins = await AuthService.getCurrentCodins();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _loggedCodins = codins);
   }
 
   Future<void> _loadItens() async {
@@ -59,8 +91,14 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
         if (!mounted) {
           return;
         }
+        final RelatorioCirurgia base = fresh ?? widget.relatorio!;
+        final RelatorioCirurgia enriched =
+            await _enrichmentService.enrichItem(base);
+        if (!mounted) {
+          return;
+        }
         setState(() {
-          _itens.add(fresh ?? widget.relatorio!);
+          _itens.add(enriched);
           _isLoading = false;
         });
       } catch (error) {
@@ -84,24 +122,57 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
       });
       return;
     }
+    final RegistroHoraListFilters? widgetFilters = widget.filters != null
+        ? RegistroHoraListFilters(relatorioFilters: widget.filters!)
+        : null;
+    RegistroHoraListFilters activeFilters = widgetFilters ?? _filters;
+    if (widgetFilters == null &&
+        !activeFilters.hasActiveFilters &&
+        RelatorioFilterState.hasActiveFilters) {
+      activeFilters = RegistroHoraListFilters(
+        relatorioFilters: RelatorioFilterState.activeFilters!,
+      );
+    }
+    if (!activeFilters.hasActiveFilters) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+        _itens.clear();
+      });
+      return;
+    }
     setState(() {
       _isLoading = true;
       _errorMessage = null;
       _itens.clear();
     });
     try {
-      final RelatorioListFilters filters = widget.filters ??
-          RelatorioListFilters(
-            dateFrom: DateTime.now(),
-            dateTo: RelatorioListFilters.maxAllowedDate(),
-          );
-      final RelatorioCirurgiaPaginatedResponse response =
-          await _listService.fetchPaginated(page: 1, filters: filters);
+      final List<RelatorioCirurgia> rawItens;
+      if (activeFilters.situacao != RegistroHoraSituacaoFilter.todos) {
+        rawItens = await _listService.fetchAllRelatorios(
+          filters: activeFilters.relatorioFilters,
+        );
+      } else {
+        final RelatorioCirurgiaPaginatedResponse response =
+            await _listService.fetchPaginated(
+          page: 1,
+          filters: activeFilters.relatorioFilters,
+        );
+        rawItens = response.itens;
+      }
+      if (!mounted) {
+        return;
+      }
+      final List<RelatorioCirurgia> filtered = rawItens
+          .where(activeFilters.situacao.matches)
+          .toList();
+      final List<RelatorioCirurgia> enriched =
+          await _enrichmentService.enrichItens(filtered);
       if (!mounted) {
         return;
       }
       setState(() {
-        _itens.addAll(response.itens);
+        _itens.addAll(enriched);
         _isLoading = false;
       });
     } catch (error) {
@@ -115,6 +186,73 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
     }
   }
 
+  Future<void> _shareList() async {
+    if (_itens.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhum registro para compartilhar.')),
+      );
+      return;
+    }
+    final ShareFormat? format = await ShareFormatSheet.show(context);
+    if (format == null || !mounted) {
+      return;
+    }
+    setState(() => _isSharing = true);
+    try {
+      if (format == ShareFormat.image) {
+        final Uint8List? bytes =
+            await ScreenCaptureService.capturePng(_shareKey);
+        if (bytes == null) {
+          throw Exception('Não foi possível capturar a imagem.');
+        }
+        await ScreenCaptureService.sharePngBytes(
+          bytes: bytes,
+          fileName: 'registro_hora_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Registro Hora Ares',
+        );
+      } else {
+        final UserModel? user = await AuthService.getCurrentUser();
+        final String userName = user?.nome ?? 'Usuário';
+        final Uint8List pdf = await _pdfService.buildListaPdf(
+          items: _itens,
+          filters: _filters,
+          userName: userName,
+        );
+        await ScreenCaptureService.sharePdfFile(
+          bytes: pdf,
+          fileName: 'registro_hora_${DateTime.now().millisecondsSinceEpoch}',
+          text: 'Registro Hora Ares',
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
+    }
+  }
+
+  Future<void> _openFilters() async {
+    if (widget.isSingleRelatorio) {
+      return;
+    }
+    final RegistroHoraListFilters? result = await RegistroHoraFilterDialog.show(
+      context,
+      initial: _filters,
+    );
+    if (result == null || !mounted) {
+      return;
+    }
+    setState(() => _filters = result);
+    RelatorioFilterState.update(result.relatorioFilters);
+    await _loadItens();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -125,8 +263,37 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
           onPressed: () => Navigator.of(context).pop(widget.isSingleRelatorio),
           tooltip: 'Voltar',
         ),
+        actions: <Widget>[
+          IconButton(
+            onPressed: _isSharing || _isLoading || _itens.isEmpty
+                ? null
+                : _shareList,
+            icon: _isSharing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.share),
+            tooltip: 'Compartilhar',
+          ),
+          if (!widget.isSingleRelatorio)
+            IconButton(
+              onPressed: _isLoading ? null : _openFilters,
+              icon: Badge(
+                isLabelVisible: _filtersActive,
+                child: const Icon(Icons.filter_list),
+              ),
+              tooltip: 'Filtros',
+            ),
+        ],
       ),
-      body: Column(
+      body: RepaintBoundary(
+        key: _shareKey,
+        child: Column(
         children: <Widget>[
           Container(
             width: double.infinity,
@@ -161,6 +328,7 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
           ),
           Expanded(child: _buildBody()),
         ],
+        ),
       ),
     );
   }
@@ -205,13 +373,8 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
   Widget _buildCard(RelatorioCirurgia item, int index) {
     final String statusLabel = item.registroHoraStatusLabel;
     final Color statusColor = _statusColor(item.registroHoraStatus);
-    final String horaCirurgia = item.horaInicioDisplay == '—'
-        ? ''
-        : item.horaInicioDisplay;
-    final String dataLinha = horaCirurgia.isEmpty
-        ? item.dataCirurgiaDisplay
-        : '${item.dataCirurgiaDisplay} às $horaCirurgia';
     final String noRel = '${item.numrel ?? item.nummov}';
+    final String instrumentador = _resolveInstrumentadorLabel(item);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -233,20 +396,13 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
                 _buildStatusBadge(statusLabel, statusColor),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              item.tipoCirurgiaDisplay,
-              style: AppTheme.listItemSubtitleStyle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
             const SizedBox(height: 8),
-            Text(
-              'Data: $dataLinha',
-              style: AppTheme.listItemSubtitleStyle.copyWith(fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            _buildInfoLine('Data Cir:', item.dataCirurgiaDisplay),
+            _buildInfoLine('No rel:', noRel),
+            _buildInfoLine('Med:', item.medicoName),
+            _buildInfoLine('Conv:', item.convenioName),
+            _buildInfoLine('Cir:', item.tipoCirurgiaDisplay),
+            _buildInfoLine('Instrumentador:', instrumentador),
             const SizedBox(height: 8),
             Row(
               children: <Widget>[
@@ -281,31 +437,22 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
-                Expanded(
-                  child: Text(
-                    'No Rel: $noRel',
-                    style: AppTheme.listItemSubtitleStyle.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                if (_canEditHorarios) ...<Widget>[
+                  TextButton.icon(
+                    onPressed: item.canRegistrarHoraInicio && !_isSaving
+                        ? () => _registrarHora(item, index, RegistroHoraCampo.inicio)
+                        : null,
+                    icon: const Icon(Icons.play_arrow, size: 16),
+                    label: const Text('Início'),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: item.canRegistrarHoraInicio && !_isSaving
-                      ? () => _registrarHora(item, index, RegistroHoraCampo.inicio)
-                      : null,
-                  icon: const Icon(Icons.play_arrow, size: 16),
-                  label: const Text('Início'),
-                ),
-                TextButton.icon(
-                  onPressed: item.canRegistrarHoraFim && !_isSaving
-                      ? () => _registrarHora(item, index, RegistroHoraCampo.fim)
-                      : null,
-                  icon: const Icon(Icons.stop, size: 16),
-                  label: const Text('Fim'),
-                ),
+                  TextButton.icon(
+                    onPressed: item.canRegistrarHoraFim && !_isSaving
+                        ? () => _registrarHora(item, index, RegistroHoraCampo.fim)
+                        : null,
+                    icon: const Icon(Icons.stop, size: 16),
+                    label: const Text('Fim'),
+                  ),
+                ],
                 TextButton.icon(
                   onPressed: () => _abrirDetalhes(item),
                   icon: const Icon(Icons.visibility, size: 16),
@@ -315,6 +462,32 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _resolveInstrumentadorLabel(RelatorioCirurgia item) {
+    if (item.codins != null && item.codins! > 0) {
+      final String nome = item.instrumentadorDisplay;
+      if (nome != '—' && !nome.startsWith('Cód.')) {
+        return nome;
+      }
+      return '${item.codins}';
+    }
+    if (_loggedCodins != null && _loggedCodins! > 0) {
+      return '${_loggedCodins!}';
+    }
+    return '—';
+  }
+
+  Widget _buildInfoLine(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Text(
+        '$label $value',
+        style: AppTheme.listItemSubtitleStyle.copyWith(fontSize: 11),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -486,11 +659,16 @@ class _RegistroHoraCirurgiaPageState extends State<RegistroHoraCirurgiaPage> {
     try {
       final RegistroHoraLocationCapture? localizacao =
           await RegistroHoraLocationService.capture();
+      final int? codinsToSave =
+          item.codins ?? (_loggedCodins != null && _loggedCodins! > 0
+              ? _loggedCodins
+              : null);
       final RelatorioCirurgia atualizado = await _service.salvarHora(
         item: item,
         campo: campo,
         hora: hora,
         localizacao: localizacao,
+        codins: codinsToSave,
       );
       final RelatorioCirurgia? refreshed =
           await _relatorioService.getById(item.nummov);

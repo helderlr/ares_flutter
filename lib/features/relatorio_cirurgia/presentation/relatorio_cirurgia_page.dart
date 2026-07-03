@@ -10,6 +10,7 @@ import '../models/relatorio_cirurgia_model.dart';
 import '../models/relatorio_list_filters.dart';
 import '../services/relatorio_cirurgia_service_paginado.dart';
 import '../services/relatorio_cirurgia_pdf_service.dart';
+import '../services/relatorio_filter_state.dart';
 import '../widgets/relatorio_filter_dialog.dart';
 import '../widgets/relatorio_status_legend.dart';
 import '../../agendamento/services/agenda_relatorio_export_service.dart';
@@ -37,10 +38,7 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
   final GlobalKey _shareKey = GlobalKey();
   final List<RelatorioCirurgia> _itens = <RelatorioCirurgia>[];
   RelatorioCirurgiaPaginationInfo? _pagination;
-  RelatorioListFilters _filters = RelatorioListFilters(
-    dateFrom: DateTime.now(),
-    dateTo: RelatorioListFilters.maxAllowedDate(),
-  );
+  RelatorioListFilters _filters = const RelatorioListFilters();
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _isSharing = false;
@@ -154,29 +152,9 @@ class _RelatorioCirurgiaPageState extends State<RelatorioCirurgiaPage> {
       return;
     }
     setState(() {
-      _filters = RelatorioListFilters(
-        dateFrom: result.dateFrom ?? DateTime.now(),
-        dateTo: result.dateTo ?? RelatorioListFilters.maxAllowedDate(),
-        dateField: result.dateField,
-        hospitalQuery: result.hospitalQuery,
-        medicoQuery: result.medicoQuery,
-        convenioQuery: result.convenioQuery,
-        pacienteQuery: result.pacienteQuery,
-        digitadoPorQuery: result.digitadoPorQuery,
-        numrelQuery: result.numrelQuery,
-        nagecirQuery: result.nagecirQuery,
-        codinsQuery: result.codinsQuery,
-        codcirQuery: result.codcirQuery,
-        codProdutoQuery: result.codProdutoQuery,
-        tipoQuery: result.tipoQuery,
-        lado: result.lado,
-        sexo: result.sexo,
-        darVisto: result.darVisto,
-        relProblema: result.relProblema,
-        relComAgenda: result.relComAgenda,
-        relComPedido: result.relComPedido,
-      );
+      _filters = result;
     });
+    RelatorioFilterState.update(result);
     await _loadFirstPage();
   }
 

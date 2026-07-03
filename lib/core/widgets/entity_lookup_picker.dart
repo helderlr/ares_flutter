@@ -3,7 +3,9 @@ import '../../features/convenio/services/convenio_service_paginado.dart';
 import '../../features/hospital/services/hospital_service_paginado.dart';
 import '../../features/medico/services/medico_service_paginado.dart';
 import '../../features/paciente/services/paciente_service.dart';
+import '../../features/instrumentador/services/instrumentador_service_paginado.dart';
 import '../../features/tipo_cirurgia/services/tipo_cirurgia_service_paginado.dart';
+import '../../features/vendedor/services/vendedor_service.dart';
 import 'entity_search_dialog.dart';
 
 class EntityLookupSelection {
@@ -135,6 +137,64 @@ class EntityLookupPicker {
     return EntityLookupSelection(
       code: '${result.codcir}',
       name: result.nomcir as String?,
+    );
+  }
+
+  static Future<EntityLookupSelection?> pickInstrumentador(
+    BuildContext context,
+  ) async {
+    final InstrumentadorServicePaginado service = InstrumentadorServicePaginado();
+    final dynamic result = await EntitySearchDialog.show<dynamic>(
+      context: context,
+      title: 'Buscar Instrumentador',
+      placeholder: 'Digite o nome do instrumentador',
+      searchFunction: (String query) async {
+        final response = await service.fetchInstrumentadoresPaginated(
+          page: 1,
+          searchQuery: query,
+        );
+        return response.instrumentadores;
+      },
+      labelOf: (dynamic item) => item.nomins as String,
+      subtitleOf: (dynamic item) => 'Código: ${item.codins}',
+    );
+    if (result == null) {
+      return null;
+    }
+    return EntityLookupSelection(
+      code: '${result.codins}',
+      name: result.nomins as String?,
+    );
+  }
+
+  static Future<EntityLookupSelection?> pickVendedor(
+    BuildContext context,
+  ) async {
+    final VendedorService service = VendedorService();
+    final dynamic result = await EntitySearchDialog.show<dynamic>(
+      context: context,
+      title: 'Buscar Vendedor',
+      placeholder: 'Digite o código do vendedor',
+      searchFunction: (String query) async {
+        final int? codven = int.tryParse(query.trim());
+        if (codven == null || codven <= 0) {
+          return <dynamic>[];
+        }
+        final VendedorLookup? vendedor = await service.fetchByCodven(codven);
+        if (vendedor == null) {
+          return <dynamic>[];
+        }
+        return <VendedorLookup>[vendedor];
+      },
+      labelOf: (dynamic item) => item.nome as String,
+      subtitleOf: (dynamic item) => 'Código: ${item.codven}',
+    );
+    if (result == null) {
+      return null;
+    }
+    return EntityLookupSelection(
+      code: '${result.codven}',
+      name: result.nome as String?,
     );
   }
 }

@@ -10,6 +10,7 @@ import '../../agendamento/services/agendamento_service.dart';
 import '../../login/services/auth_service.dart';
 import '../models/relatorio_cirurgia_model.dart';
 import '../services/relatorio_cirurgia_service.dart';
+import '../services/relatorio_cirurgia_service_paginado.dart';
 import '../utils/relatorio_field_labels.dart';
 
 class RelatorioCirurgiaFormPage extends StatefulWidget {
@@ -24,6 +25,8 @@ class RelatorioCirurgiaFormPage extends StatefulWidget {
 
 class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
   final RelatorioCirurgiaService _service = RelatorioCirurgiaService();
+  final RelatorioCirurgiaServicePaginado _listService =
+      RelatorioCirurgiaServicePaginado();
   final AgendamentoService _agendaService = AgendamentoService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   int _tabIndex = 0;
@@ -226,6 +229,26 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     });
   }
 
+  Future<void> _warnAgendaDuplicada(int nagecir) async {
+    final RelatorioCirurgia? existente = await _listService.findByNagecir(
+      nagecir,
+      excludeNummov: _isEditing ? widget.relatorio!.nummov : null,
+    );
+    if (!mounted || existente == null) {
+      return;
+    }
+    final String noRel = '${existente.numrel ?? existente.nummov}';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Agenda $nagecir já possui relatório Nº $noRel.',
+        ),
+        backgroundColor: Colors.orange.shade800,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
   Future<void> _loadFromAgenda() async {
     if (_isReadOnly) {
       return;
@@ -236,6 +259,7 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     }
     setState(() => _isLoadingAgenda = true);
     try {
+      await _warnAgendaDuplicada(nagecir);
       final AgendaCirurgia? agenda =
           await _agendaService.fetchAgendaById(nagecir);
       if (!mounted) {
@@ -346,7 +370,10 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
     _medNome = item.medNome;
     _cliNome = item.cliNome;
     _convNome = item.convNome;
-    _tipoCirNome = item.tipoCirNome;
+    _tipoCirNome = item.tipoCirNome ?? item.tipoCirurgiaDisplay;
+    if (_tipoCirNome == 'Cirurgia não informada') {
+      _tipoCirNome = null;
+    }
     _digitadoPorNome = item.digitadorLabel;
     _nagecirController.text = item.nagecir?.toString() ?? '';
     _numreqController.text = item.numreq?.toString() ?? '';
@@ -651,6 +678,12 @@ class _RelatorioCirurgiaFormPageState extends State<RelatorioCirurgiaFormPage> {
           label: 'Local Cirurgia',
           value: _cliNome,
           onSearch: _isReadOnly ? null : _pickHospital,
+          readOnly: _isReadOnly,
+        ),
+        FormSectionLookup(
+          label: 'Tipo Cirurgia',
+          value: _tipoCirNome,
+          onSearch: _isReadOnly ? null : _pickTipoCirurgia,
           readOnly: _isReadOnly,
         ),
       ],

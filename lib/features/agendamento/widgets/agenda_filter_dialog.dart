@@ -1,36 +1,26 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/entity_lookup_picker.dart';
+import '../../../core/widgets/form_section_field.dart';
 import '../../../core/widgets/protected_ui.dart';
 import '../models/agenda_list_filters.dart';
 
 class AgendaFilterDialog {
-  static InputDecoration _decoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      isDense: true,
-    );
-  }
-
-  static InputDecoration _searchDecoration(String label) {
-    return _decoration(label).copyWith(
-      suffixIcon: const Icon(Icons.search),
-    );
-  }
-
-  static DateTime _clampDate(
-    DateTime value,
-    DateTime minDate,
-    DateTime maxDate,
-  ) {
-    if (value.isBefore(minDate)) {
-      return minDate;
+  static Future<void> _applyLookup({
+    required BuildContext context,
+    required Future<EntityLookupSelection?> Function() pick,
+    required TextEditingController controller,
+    required void Function(String? name) setName,
+    required StateSetter setStateDialog,
+  }) async {
+    final EntityLookupSelection? selection = await pick();
+    if (selection == null) {
+      return;
     }
-    if (value.isAfter(maxDate)) {
-      return maxDate;
-    }
-    return value;
+    setStateDialog(() {
+      controller.text = selection.code;
+      setName(selection.name);
+    });
   }
 
   static String _formatDate(DateTime date) {
@@ -70,6 +60,13 @@ class AgendaFilterDialog {
     final TextEditingController vendedorController = TextEditingController(
       text: initial?.vendedorQuery ?? '',
     );
+    String? pacienteName;
+    String? medicoName;
+    String? convenioName;
+    String? hospitalName;
+    String? tipoCirurgiaName;
+    String? instrumentadorName;
+    String? vendedorName;
     DateTime? dateFrom = initial?.dateFrom;
     DateTime? dateTo = initial?.dateTo;
     AgendaDateFilterField dateField =
@@ -97,330 +94,345 @@ class AgendaFilterDialog {
                     ? AgendaListFilters.minAllowedMovementDate()
                     : AgendaListFilters.minAllowedSurgeryDate();
             return AlertDialog(
-              title: const Text('Filtros'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    DropdownButtonFormField<AgendaDateFilterField>(
-                      value: dateField,
-                      decoration: _decoration('Tipo de data'),
-                      items: const <DropdownMenuItem<AgendaDateFilterField>>[
-                        DropdownMenuItem<AgendaDateFilterField>(
-                          value: AgendaDateFilterField.dataCirurgia,
-                          child: Text('Data Cirurgia'),
-                        ),
-                        DropdownMenuItem<AgendaDateFilterField>(
-                          value: AgendaDateFilterField.dataMovto,
-                          child: Text('Data Movto'),
-                        ),
-                      ],
-                      onChanged: (AgendaDateFilterField? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => dateField = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Período:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final DateTime? picked = await showProtectedDatePicker(
-                          context: context,
-                          initialDate: _clampDate(
-                            dateFrom ?? DateTime.now(),
-                            pickerMinDate,
-                            maxDate,
+              title: const Text('Filtro Agenda Cirurgia'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      FormSectionDropdown<AgendaDateFilterField>(
+                        label: 'Tipo de data',
+                        value: dateField,
+                        items: const <DropdownMenuItem<AgendaDateFilterField>>[
+                          DropdownMenuItem<AgendaDateFilterField>(
+                            value: AgendaDateFilterField.dataCirurgia,
+                            child: Text('Data Cirurgia'),
                           ),
-                          firstDate: pickerMinDate,
-                          lastDate: maxDate,
-                        );
-                        if (picked != null) {
-                          setStateDialog(() => dateFrom = picked);
-                        }
-                      },
-                      child: Text(
-                        dateFrom != null
-                            ? 'De: ${_formatDate(dateFrom!)}'
-                            : 'Data início',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final DateTime? picked = await showProtectedDatePicker(
-                          context: context,
-                          initialDate: _clampDate(
-                            dateTo ?? DateTime.now(),
-                            pickerMinDate,
-                            maxDate,
+                          DropdownMenuItem<AgendaDateFilterField>(
+                            value: AgendaDateFilterField.dataMovto,
+                            child: Text('Data Movto'),
                           ),
-                          firstDate: pickerMinDate,
-                          lastDate: maxDate,
-                        );
-                        if (picked != null) {
-                          setStateDialog(() => dateTo = picked);
-                        }
-                      },
-                      child: Text(
-                        dateTo != null
-                            ? 'Até: ${_formatDate(dateTo!)}'
-                            : 'Data fim',
+                        ],
+                        onChanged: (AgendaDateFilterField? value) {
+                          if (value != null) {
+                            setStateDialog(() => dateField = value);
+                          }
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: pacienteController,
-                      decoration: _searchDecoration('Paciente'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: nummovController,
-                      decoration: _decoration('No Agenda'),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: medicoController,
-                      decoration: _searchDecoration('Médico'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: convenioController,
-                      decoration: _searchDecoration('Convênio'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: hospitalController,
-                      decoration: _searchDecoration('Hospital'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: tipoCirurgiaController,
-                      decoration: _searchDecoration('Tipo de Cirurgia'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: instrumentadorController,
-                      decoration: _searchDecoration('Instrumentador'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: vendedorController,
-                      decoration: _searchDecoration('Vendedor'),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTipmarFilter>(
-                      value: tipoMarcacao,
-                      decoration: _decoration('Tipo Marcação'),
-                      items: const <DropdownMenuItem<AgendaTipmarFilter>>[
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.todas,
-                          child: Text('Todas'),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () async {
+                          final DateTime? picked = await showProtectedDatePicker(
+                            context: context,
+                            initialDate: dateFrom ?? DateTime.now(),
+                            firstDate: pickerMinDate,
+                            lastDate: maxDate,
+                          );
+                          if (picked != null) {
+                            setStateDialog(() => dateFrom = picked);
+                          }
+                        },
+                        child: Text(
+                          dateFrom != null
+                              ? 'Data Inicio: ${_formatDate(dateFrom!)}'
+                              : 'Data Inicio',
                         ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.app,
-                          child: Text('A - App'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        onPressed: () async {
+                          final DateTime? picked = await showProtectedDatePicker(
+                            context: context,
+                            initialDate: dateTo ?? DateTime.now(),
+                            firstDate: pickerMinDate,
+                            lastDate: maxDate,
+                          );
+                          if (picked != null) {
+                            setStateDialog(() => dateTo = picked);
+                          }
+                        },
+                        child: Text(
+                          dateTo != null
+                              ? 'Data Termino: ${_formatDate(dateTo!)}'
+                              : 'Data Termino',
                         ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.web,
-                          child: Text('W - Web'),
+                      ),
+                      const SizedBox(height: 12),
+                      FormSectionField(
+                        label: 'Paciente',
+                        controller: pacienteController,
+                        subtitle: pacienteName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickPaciente(context),
+                          controller: pacienteController,
+                          setName: (String? name) => pacienteName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.desktop,
-                          child: Text('Vazio - Desktop'),
+                      ),
+                      FormSectionField(
+                        label: 'No Agenda',
+                        controller: nummovController,
+                        keyboardType: TextInputType.number,
+                      ),
+                      FormSectionField(
+                        label: 'Medico',
+                        controller: medicoController,
+                        subtitle: medicoName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickMedico(context),
+                          controller: medicoController,
+                          setName: (String? name) => medicoName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.googleAgenda,
-                          child: Text('Google Agenda'),
+                      ),
+                      FormSectionField(
+                        label: 'Convenio',
+                        controller: convenioController,
+                        subtitle: convenioName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickConvenio(context),
+                          controller: convenioController,
+                          setName: (String? name) => convenioName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                      ],
-                      onChanged: (AgendaTipmarFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => tipoMarcacao = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: agendaCancelada,
-                      decoration: _decoration('Agenda Cancelada'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
+                      ),
+                      FormSectionField(
+                        label: 'Hospital',
+                        controller: hospitalController,
+                        subtitle: hospitalName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickHospital(context),
+                          controller: hospitalController,
+                          setName: (String? name) => hospitalName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
+                      ),
+                      FormSectionField(
+                        label: 'Tipo Cirurgia',
+                        controller: tipoCirurgiaController,
+                        subtitle: tipoCirurgiaName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickTipoCirurgia(context),
+                          controller: tipoCirurgiaController,
+                          setName: (String? name) => tipoCirurgiaName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
+                      ),
+                      FormSectionField(
+                        label: 'Instrumentador',
+                        controller: instrumentadorController,
+                        subtitle: instrumentadorName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickInstrumentador(context),
+                          controller: instrumentadorController,
+                          setName: (String? name) => instrumentadorName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => agendaCancelada = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: agendaComPedido,
-                      decoration: _decoration('Agenda com Pedido'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todos'),
+                      ),
+                      FormSectionField(
+                        label: 'Vendedor',
+                        controller: vendedorController,
+                        subtitle: vendedorName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickVendedor(context),
+                          controller: vendedorController,
+                          setName: (String? name) => vendedorName = name,
+                          setStateDialog: setStateDialog,
                         ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => agendaComPedido = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: agendaComRelatorio,
-                      decoration: _decoration('Agenda com Relatório'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => agendaComRelatorio = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: agendaCopia,
-                      decoration: _decoration('Agenda Cópia'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => agendaCopia = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaLadoFilter>(
-                      value: lado,
-                      decoration: _decoration('Lado'),
-                      items: const <DropdownMenuItem<AgendaLadoFilter>>[
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.esquerdo,
-                          child: Text('Esquerdo'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.direito,
-                          child: Text('Direito'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.vazio,
-                          child: Text('Vazio'),
-                        ),
-                      ],
-                      onChanged: (AgendaLadoFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => lado = value);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaSituacaoFilter>(
-                      value: situacao,
-                      decoration: _decoration('Situação agenda'),
-                      items: AgendaSituacaoFilter.values
-                          .map(
-                            (AgendaSituacaoFilter value) =>
-                                DropdownMenuItem<AgendaSituacaoFilter>(
-                              value: value,
-                              child: Text(value.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (AgendaSituacaoFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() => situacao = value);
-                      },
-                    ),
-                  ],
+                      ),
+                      FormSectionDropdown<AgendaTipmarFilter>(
+                        label: 'Tipo Marcacao',
+                        value: tipoMarcacao,
+                        items: const <DropdownMenuItem<AgendaTipmarFilter>>[
+                          DropdownMenuItem<AgendaTipmarFilter>(
+                            value: AgendaTipmarFilter.todas,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<AgendaTipmarFilter>(
+                            value: AgendaTipmarFilter.app,
+                            child: Text('A - App'),
+                          ),
+                          DropdownMenuItem<AgendaTipmarFilter>(
+                            value: AgendaTipmarFilter.web,
+                            child: Text('W - Web'),
+                          ),
+                          DropdownMenuItem<AgendaTipmarFilter>(
+                            value: AgendaTipmarFilter.desktop,
+                            child: Text('Vazio - Desktop'),
+                          ),
+                          DropdownMenuItem<AgendaTipmarFilter>(
+                            value: AgendaTipmarFilter.googleAgenda,
+                            child: Text('Google Agenda'),
+                          ),
+                        ],
+                        onChanged: (AgendaTipmarFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => tipoMarcacao = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaTriFilter>(
+                        label: 'Agenda Cancelada',
+                        value: agendaCancelada,
+                        items: const <DropdownMenuItem<AgendaTriFilter>>[
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.todas,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.sim,
+                            child: Text('Sim'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.nao,
+                            child: Text('Não'),
+                          ),
+                        ],
+                        onChanged: (AgendaTriFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => agendaCancelada = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaTriFilter>(
+                        label: 'Agenda com Pedido',
+                        value: agendaComPedido,
+                        items: const <DropdownMenuItem<AgendaTriFilter>>[
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.todas,
+                            child: Text('Todos'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.sim,
+                            child: Text('Sim'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.nao,
+                            child: Text('Não'),
+                          ),
+                        ],
+                        onChanged: (AgendaTriFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => agendaComPedido = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaTriFilter>(
+                        label: 'Agenda com Relatorio',
+                        value: agendaComRelatorio,
+                        items: const <DropdownMenuItem<AgendaTriFilter>>[
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.todas,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.sim,
+                            child: Text('Sim'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.nao,
+                            child: Text('Não'),
+                          ),
+                        ],
+                        onChanged: (AgendaTriFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => agendaComRelatorio = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaTriFilter>(
+                        label: 'Agenda Copia',
+                        value: agendaCopia,
+                        items: const <DropdownMenuItem<AgendaTriFilter>>[
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.todas,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.sim,
+                            child: Text('Sim'),
+                          ),
+                          DropdownMenuItem<AgendaTriFilter>(
+                            value: AgendaTriFilter.nao,
+                            child: Text('Não'),
+                          ),
+                        ],
+                        onChanged: (AgendaTriFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => agendaCopia = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaLadoFilter>(
+                        label: 'Lado',
+                        value: lado,
+                        items: const <DropdownMenuItem<AgendaLadoFilter>>[
+                          DropdownMenuItem<AgendaLadoFilter>(
+                            value: AgendaLadoFilter.todas,
+                            child: Text('Todas'),
+                          ),
+                          DropdownMenuItem<AgendaLadoFilter>(
+                            value: AgendaLadoFilter.esquerdo,
+                            child: Text('Esquerdo'),
+                          ),
+                          DropdownMenuItem<AgendaLadoFilter>(
+                            value: AgendaLadoFilter.direito,
+                            child: Text('Direito'),
+                          ),
+                          DropdownMenuItem<AgendaLadoFilter>(
+                            value: AgendaLadoFilter.vazio,
+                            child: Text('Vazio'),
+                          ),
+                        ],
+                        onChanged: (AgendaLadoFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => lado = value);
+                          }
+                        },
+                      ),
+                      FormSectionDropdown<AgendaSituacaoFilter>(
+                        label: 'Situacao agenda',
+                        value: situacao,
+                        items: AgendaSituacaoFilter.values
+                            .map(
+                              (AgendaSituacaoFilter value) =>
+                                  DropdownMenuItem<AgendaSituacaoFilter>(
+                                value: value,
+                                child: Text(value.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (AgendaSituacaoFilter? value) {
+                          if (value != null) {
+                            setStateDialog(() => situacao = value);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: <Widget>[
                 if (showClearButton)
                   TextButton(
                     onPressed: () {
-                      setStateDialog(() {
-                        dateFrom = null;
-                        dateTo = null;
-                        dateField = AgendaDateFilterField.dataCirurgia;
-                        agendaCancelada = AgendaTriFilter.todas;
-                        agendaComPedido = AgendaTriFilter.todas;
-                        agendaComRelatorio = AgendaTriFilter.todas;
-                        agendaCopia = AgendaTriFilter.todas;
-                        tipoMarcacao = AgendaTipmarFilter.todas;
-                        lado = AgendaLadoFilter.todas;
-                        situacao = AgendaSituacaoFilter.todos;
-                      });
-                      pacienteController.clear();
-                      nummovController.clear();
-                      medicoController.clear();
-                      convenioController.clear();
-                      hospitalController.clear();
-                      tipoCirurgiaController.clear();
-                      instrumentadorController.clear();
-                      vendedorController.clear();
+                      Navigator.of(dialogContext).pop(const AgendaListFilters());
                     },
                     child: const Text('Limpar'),
                   ),
@@ -428,7 +440,7 @@ class AgendaFilterDialog {
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('Cancelar'),
                 ),
-                ElevatedButton(
+                FilledButton(
                   onPressed: () {
                     final bool hasAgendaNumber =
                         _trimOrNull(nummovController.text) != null;

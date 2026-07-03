@@ -419,6 +419,14 @@ class AuthService {
     return null;
   }
 
+  static Future<int?> getCurrentCodins() async {
+    final UserModel? user = await getCurrentUser();
+    if (user?.codins != null && user!.codins! > 0) {
+      return user.codins;
+    }
+    return null;
+  }
+
   static int? _parseCodven(String? value) {
     if (value == null || value.trim().isEmpty) {
       return null;

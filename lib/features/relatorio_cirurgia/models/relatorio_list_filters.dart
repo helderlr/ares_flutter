@@ -104,15 +104,7 @@ class RelatorioListFilters {
   }
 
   bool get hasNonDefaultDateRange {
-    if (dateFrom == null && dateTo == null) {
-      return false;
-    }
-    final DateTime today = _dateOnly(DateTime.now());
-    final DateTime defaultTo = _dateOnly(maxAllowedDate());
-    final DateTime? from =
-        dateFrom != null ? _dateOnly(dateFrom!) : null;
-    final DateTime? to = dateTo != null ? _dateOnly(dateTo!) : null;
-    return from != today || to != defaultTo;
+    return dateFrom != null || dateTo != null;
   }
 
   bool get hasTextFilters {

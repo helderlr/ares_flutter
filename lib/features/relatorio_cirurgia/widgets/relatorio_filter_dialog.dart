@@ -62,6 +62,9 @@ class RelatorioFilterDialog {
   static Future<RelatorioListFilters?> show(
     BuildContext context, {
     RelatorioListFilters? initial,
+    String title = 'Filtro Rel Cirurgia',
+    List<Widget> Function(StateSetter setStateDialog)? prefixFields,
+    VoidCallback? onClearExtra,
   }) async {
     final TextEditingController hospitalController = TextEditingController(
       text: initial?.hospitalQuery ?? '',
@@ -100,8 +103,11 @@ class RelatorioFilterDialog {
     String? medicoName;
     String? convenioName;
     String? pacienteName;
-    DateTime? dateFrom = initial?.dateFrom ?? DateTime.now();
-    DateTime? dateTo = initial?.dateTo ?? RelatorioListFilters.maxAllowedDate();
+    String? circulanteName;
+    String? instrumentadorName;
+    String? tipoCirurgiaName;
+    DateTime? dateFrom = initial?.dateFrom;
+    DateTime? dateTo = initial?.dateTo;
     RelatorioDateFilterField dateField =
         initial?.dateField ?? RelatorioDateFilterField.dataCirurgia;
     RelatorioLadoFilter lado = initial?.lado ?? RelatorioLadoFilter.todos;
@@ -118,7 +124,7 @@ class RelatorioFilterDialog {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setStateDialog) {
             return AlertDialog(
-              title: const Text('Filtro Rel Cirurgia'),
+              title: Text(title),
               content: SizedBox(
                 width: double.maxFinite,
                 child: SingleChildScrollView(
@@ -126,6 +132,7 @@ class RelatorioFilterDialog {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
+                      if (prefixFields != null) ...prefixFields(setStateDialog),
                       FormSectionField(
                         label: 'Local Cirurgia',
                         controller: hospitalController,
@@ -237,11 +244,28 @@ class RelatorioFilterDialog {
                       FormSectionField(
                         label: 'Tipo',
                         controller: tipoController,
+                        subtitle: tipoCirurgiaName,
+                        keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickTipoCirurgia(context),
+                          controller: tipoController,
+                          setName: (String? name) => tipoCirurgiaName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
                       FormSectionField(
                         label: 'Circulante',
                         controller: codcirController,
+                        subtitle: circulanteName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickTipoCirurgia(context),
+                          controller: codcirController,
+                          setName: (String? name) => circulanteName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
                       OutlinedButton(
                         onPressed: () async {
@@ -324,7 +348,15 @@ class RelatorioFilterDialog {
                       FormSectionField(
                         label: 'Instrumentador',
                         controller: codinsController,
+                        subtitle: instrumentadorName,
                         keyboardType: TextInputType.number,
+                        onSearch: () => _applyLookup(
+                          context: context,
+                          pick: () => EntityLookupPicker.pickInstrumentador(context),
+                          controller: codinsController,
+                          setName: (String? name) => instrumentadorName = name,
+                          setStateDialog: setStateDialog,
+                        ),
                       ),
                       FormSectionField(
                         label: 'Produto',
@@ -352,6 +384,7 @@ class RelatorioFilterDialog {
                 ),
                 TextButton(
                   onPressed: () {
+                    onClearExtra?.call();
                     Navigator.of(dialogContext).pop(const RelatorioListFilters());
                   },
                   child: const Text('Limpar'),

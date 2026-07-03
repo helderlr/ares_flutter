@@ -92,6 +92,7 @@ class RelatorioCirurgia {
   final String? cliNome;
   final String? convNome;
   final String? tipoCirNome;
+  final String? insNome;
   final String? usulanNome;
   final String? enderecoInicio;
   final String? enderecoFim;
@@ -163,6 +164,7 @@ class RelatorioCirurgia {
     this.cliNome,
     this.convNome,
     this.tipoCirNome,
+    this.insNome,
     this.usulanNome,
     this.enderecoInicio,
     this.enderecoFim,
@@ -221,28 +223,38 @@ class RelatorioCirurgia {
   }
 
   String get tipoCirurgiaDisplay {
-    final String? tipo = tipoCirNome?.trim();
-    if (tipo != null && tipo.isNotEmpty) {
-      return tipo;
+    final String? nomeTipo = tipoCirNome?.trim();
+    if (nomeTipo != null && nomeTipo.isNotEmpty) {
+      return nomeTipo;
     }
-    final String? cirurgia = cirhos?.trim();
-    if (cirurgia != null && cirurgia.isNotEmpty) {
-      return cirurgia;
+    final String? tipoValor = tipo?.trim();
+    if (tipoValor != null && tipoValor.isNotEmpty) {
+      return tipoValor;
     }
-    final String? nome = nomcir?.trim();
-    if (nome != null && nome.isNotEmpty) {
-      return nome;
+    final int? codTipo = codcir ?? circod;
+    if (codTipo != null) {
+      return 'Cód. $codTipo';
     }
     return 'Cirurgia não informada';
   }
 
-  bool get hasRegistroHoraInicio =>
-      dtHoraInicio != null || _hasTimeText(hrini);
+  String get instrumentadorDisplay {
+    final String? nome = insNome?.trim();
+    if (nome != null && nome.isNotEmpty) {
+      return nome;
+    }
+    if (codins != null) {
+      return 'Cód. $codins';
+    }
+    return '—';
+  }
 
-  bool get hasRegistroHoraFim => dtHoraFim != null || _hasTimeText(hrfin);
+  bool get hasRegistroHoraInicio => _isMeaningfulHora(hrini);
+
+  bool get hasRegistroHoraFim => _isMeaningfulHora(hrfin);
 
   RegistroHoraStatus get registroHoraStatus {
-    if (hasRegistroHoraInicio && hasRegistroHoraFim) {
+    if (hasRegistroHoraFim) {
       return RegistroHoraStatus.concluida;
     }
     if (hasRegistroHoraInicio) {
@@ -300,13 +312,33 @@ class RelatorioCirurgia {
     return duracao < minutos;
   }
 
-  String get horaInicioDisplay => _formatHoraDisplay(dtHoraInicio, hrini);
+  String get horaInicioDisplay {
+    if (_isMeaningfulHora(hrini)) {
+      return _formatHoraDisplay(null, hrini);
+    }
+    if (dtHoraInicio != null) {
+      return _formatHoraDisplay(dtHoraInicio, null);
+    }
+    return '—';
+  }
 
-  String get horaFimDisplay => _formatHoraDisplay(dtHoraFim, hrfin);
+  String get horaFimDisplay {
+    if (_isMeaningfulHora(hrfin)) {
+      return _formatHoraDisplay(null, hrfin);
+    }
+    if (dtHoraFim != null) {
+      return _formatHoraDisplay(dtHoraFim, null);
+    }
+    return '—';
+  }
 
   String get duracaoRegistroHoraDisplay {
-    final DateTime? inicio = registroHoraInicioResolvido;
-    final DateTime? fim = resolveRegistroHoraDateTime(dtHoraFim, hrfin);
+    final DateTime? inicio = _isMeaningfulHora(hrini)
+        ? resolveRegistroHoraDateTime(null, hrini)
+        : dtHoraInicio;
+    final DateTime? fim = _isMeaningfulHora(hrfin)
+        ? resolveRegistroHoraDateTime(null, hrfin)
+        : dtHoraFim;
     if (inicio == null || fim == null) {
       return '—';
     }
@@ -328,11 +360,22 @@ class RelatorioCirurgia {
 
   bool get hasLocalizacaoFim => latitudeFim != null && longitudeFim != null;
 
-  static bool _hasTimeText(String? value) {
+  static bool _isMeaningfulHora(String? value) {
     final String trimmed = value?.trim() ?? '';
-    return trimmed.isNotEmpty && trimmed != '—';
+    if (trimmed.isEmpty || trimmed == '—') {
+      return false;
+    }
+    final List<String> parts = trimmed.split(':');
+    if (parts.length < 2) {
+      return true;
+    }
+    final int hora = int.tryParse(parts[0].trim()) ?? 0;
+    final int minuto = int.tryParse(parts[1].trim()) ?? 0;
+    final int segundo = parts.length >= 3
+        ? int.tryParse(parts[2].trim()) ?? 0
+        : 0;
+    return hora > 0 || minuto > 0 || segundo > 0;
   }
-
   static String _formatHoraDisplay(DateTime? timestamp, String? fallback) {
     if (timestamp != null) {
       return '${timestamp.hour.toString().padLeft(2, '0')}:'
@@ -454,6 +497,25 @@ class RelatorioCirurgia {
     return null;
   }
 
+  static String? _parseTipoCirurgiaNome(Map<String, dynamic> json) {
+    final dynamic tipoCirurgiaJson =
+        json['tipo_cirurgia'] ?? json['tipoCirurgia'];
+    if (tipoCirurgiaJson is Map<String, dynamic>) {
+      final String? nestedNome = _parseString(
+        tipoCirurgiaJson['nomcir'] ?? tipoCirurgiaJson['nome'],
+      );
+      if (nestedNome != null) {
+        return nestedNome;
+      }
+    }
+    return _parseString(json['tipo_cir_nome']) ??
+        _parseString(json['nomcir_']) ??
+        _parseString(json['NOMCIR_']) ??
+        _parseString(json['nomcir_tipo']) ??
+        _parseString(json['cir_nome']) ??
+        _parseString(json['CIR_NOME']);
+  }
+
   static String? _parseString(dynamic value) {
     if (value == null) {
       return null;
@@ -530,7 +592,10 @@ class RelatorioCirurgia {
       medNome: _parseString(json['med_nome']),
       cliNome: _parseString(json['cli_nome']),
       convNome: _parseString(json['conv_nome']),
-      tipoCirNome: _parseString(json['tipo_cir_nome']),
+      tipoCirNome: _parseTipoCirurgiaNome(json),
+      insNome: _parseString(
+        json['ins_nome'] ?? json['nominstru1'] ?? json['NOMINSTRU1'],
+      ),
       usulanNome: _parseString(json['usulan_nome'] ?? json['usu_nome']),
       enderecoInicio: _parseString(json['endereco_inicio']),
       enderecoFim: _parseString(json['endereco_fim']),

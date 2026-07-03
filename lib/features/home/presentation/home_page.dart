@@ -13,6 +13,7 @@ import '../../convenio/presentation/convenio_page.dart';
 import '../../tipo_cirurgia/presentation/tipo_cirurgia_page.dart';
 import '../../agendamento/presentation/agendamento_page.dart';
 import '../../configuracao/presentation/configuracao_page.dart';
+import '../../miscelanea/presentation/miscelanea_performance_operacional_page.dart';
 import '../../registro_hora_cirurgia/presentation/registro_hora_cirurgia_page.dart';
 import '../../atendimento/presentation/atendimento_dashboard_page.dart';
 import '../../atendimento/presentation/atendimento_consultas_page.dart';
@@ -24,6 +25,7 @@ import '../../relatorio_cirurgia/presentation/relatorio_cirurgia_page.dart';
 import '../../atendimento/presentation/atendimento_rota_inteligente_page.dart';
 import '../../atendimento/presentation/atendimento_escala_page.dart';
 import '../../atendimento/presentation/atendimento_agenda_visita_page.dart';
+import '../../cartao_protese/presentation/cartao_protese_list_page.dart';
 
 class _HomeMenuItem {
   final String title;
@@ -185,6 +187,17 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       _HomeMenuItem(
+        title: 'Cartão Prótese',
+        subtitle: 'Cartoes de protese',
+        icon: Icons.credit_card,
+        color: Colors.blueGrey,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CartaoProteseListPage(),
+          ),
+        ),
+      ),
+      _HomeMenuItem(
         title: 'Relatórios',
         subtitle: 'PDF / Excel / impressão',
         icon: Icons.description,
@@ -248,6 +261,38 @@ class _HomePageState extends State<HomePage> {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const RegistroHoraCirurgiaPage(),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<_HomeMenuItem> _buildMiscelaneaItems() {
+    return <_HomeMenuItem>[
+      _HomeMenuItem(
+        title: 'Parâmetro',
+        subtitle: 'Configurações do sistema',
+        icon: Icons.tune,
+        color: Colors.blueGrey,
+        onTap: () async {
+          final bool? changed = await Navigator.of(context).push<bool>(
+            MaterialPageRoute<bool>(
+              builder: (_) => const ConfiguracaoPage(),
+            ),
+          );
+          if (changed == true && mounted) {
+            setState(() => _avatarRefreshKey++);
+          }
+        },
+      ),
+      _HomeMenuItem(
+        title: 'Performance',
+        subtitle: 'Operacional',
+        icon: Icons.bar_chart,
+        color: Colors.deepPurple,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => const MiscelaneaPerformanceOperacionalPage(),
           ),
         ),
       ),
@@ -347,6 +392,7 @@ class _HomePageState extends State<HomePage> {
       MenuOption(title: 'Rota inteligente', icon: Icons.route),
       MenuOption(title: 'Escala', icon: Icons.swap_vert),
       MenuOption(title: 'Agenda visita', icon: Icons.event_note),
+      MenuOption(title: 'Cartão Prótese', icon: Icons.credit_card),
       MenuOption(title: 'Relatórios', icon: Icons.description),
       MenuOption(title: 'Paciente', icon: Icons.person),
       MenuOption(title: 'Médico', icon: Icons.medical_services),
@@ -373,7 +419,8 @@ class _HomePageState extends State<HomePage> {
 
   List<MenuOption> _buildMiscelaneaMenuOptions() {
     return const <MenuOption>[
-      MenuOption(title: 'Parâmetros', icon: Icons.tune),
+      MenuOption(title: 'Parâmetro', icon: Icons.tune),
+      MenuOption(title: 'Performance', icon: Icons.bar_chart),
     ];
   }
 
@@ -503,13 +550,29 @@ class _HomePageState extends State<HomePage> {
       );
       return;
     }
-    if (title == 'Parâmetros') {
+    if (title == 'Cartão Prótese') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const CartaoProteseListPage(),
+        ),
+      );
+      return;
+    }
+    if (title == 'Parâmetro' || title == 'Parâmetros') {
       final bool? changed = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => const ConfiguracaoPage()),
       );
       if (changed == true && mounted) {
         setState(() => _avatarRefreshKey++);
       }
+      return;
+    }
+    if (title == 'Performance' || title == 'Performance operacional') {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const MiscelaneaPerformanceOperacionalPage(),
+        ),
+      );
       return;
     }
     if (title == 'Termos e Condições') {
@@ -677,6 +740,15 @@ class _HomePageState extends State<HomePage> {
               items: _buildEstoqueItems(),
               crossAxisCount: 3,
               childAspectRatio: 0.88,
+            ),
+            const SizedBox(height: 28.0),
+            _buildSectionTitle(context, 'Miscelanea', Icons.apps_outlined),
+            const SizedBox(height: 16.0),
+            _buildMenuGrid(
+              context: context,
+              items: _buildMiscelaneaItems(),
+              crossAxisCount: 3,
+              childAspectRatio: 0.72,
             ),
           ],
         ),

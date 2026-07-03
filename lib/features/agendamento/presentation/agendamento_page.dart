@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -13,6 +13,7 @@ import '../services/agendamento_service_paginado.dart';
 import '../services/agenda_lista_pdf_service.dart';
 import '../../login/models/user_model.dart';
 import '../../login/services/auth_service.dart';
+import '../widgets/agenda_filter_dialog.dart';
 import '../widgets/agenda_status_legend.dart';
 import 'agendamento_form_page.dart';
 import 'consulta_agendamento_page.dart';
@@ -199,14 +200,14 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       _hasError = false;
       _errorMessage = '';
     });
-    print('🔄 Definindo _isLoading = true');
+    print('ðŸ”„ Definindo _isLoading = true');
 
     try {
-      print('🔄 Carregando primeira página...');
-      print('🔍 Parâmetros de busca:');
-      print('  - Página: 1');
+      print('ðŸ”„ Carregando primeira pÃ¡gina...');
+      print('ðŸ” ParÃ¢metros de busca:');
+      print('  - PÃ¡gina: 1');
       print('  - Tamanho: 50');
-      print('  - Ordenação: date desc');
+      print('  - OrdenaÃ§Ã£o: date desc');
       print('  - Busca: "$_currentSearchQuery"');
 
       final response = await _service.fetchAgendamentosPaginated(
@@ -223,19 +224,19 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         _paginationInfo = response.pagination;
         _isLoading = false;
       });
-      print('🔄 Definindo _isLoading = false');
+      print('ðŸ”„ Definindo _isLoading = false');
 
       print(
-          '✅ Primeira página carregada: ${_agendamentos.length} agendamentos');
-      print('📊 Total de registros: ${_paginationInfo?.totalRecords}');
+          'âœ… Primeira pÃ¡gina carregada: ${_agendamentos.length} agendamentos');
+      print('ðŸ“Š Total de registros: ${_paginationInfo?.totalRecords}');
     } catch (e) {
-      print('❌ Erro ao carregar primeira página: $e');
+      print('âŒ Erro ao carregar primeira pÃ¡gina: $e');
       setState(() {
         _isLoading = false;
         _hasError = true;
         _errorMessage = _formatUserError(e);
       });
-      print('🔄 Definindo _isLoading = false (erro)');
+      print('ðŸ”„ Definindo _isLoading = false (erro)');
     }
   }
 
@@ -246,7 +247,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       return;
     }
 
-    print('📄 Carregando próxima página...');
+    print('ðŸ“„ Carregando prÃ³xima pÃ¡gina...');
     setState(() {
       _isLoading = true;
     });
@@ -267,9 +268,9 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       });
 
       print(
-          '✅ Próxima página carregada: ${response.agendamentos.length} novos agendamentos');
+          'âœ… PrÃ³xima pÃ¡gina carregada: ${response.agendamentos.length} novos agendamentos');
     } catch (e) {
-      print('❌ Erro ao carregar próxima página: $e');
+      print('âŒ Erro ao carregar prÃ³xima pÃ¡gina: $e');
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -286,7 +287,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   void _navigateToForm([AgendaCirurgia? agendamento]) async {
-    print('🔄 Navegando para formulário de agendamento...');
+    print('ðŸ”„ Navegando para formulÃ¡rio de agendamento...');
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => AgendamentoFormPage(agendamento: agendamento),
@@ -294,7 +295,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     );
 
     if (result == true) {
-      print('✅ Retornando do formulário - atualizando lista');
+      print('âœ… Retornando do formulÃ¡rio - atualizando lista');
       await _refreshAgendamentos();
     }
   }
@@ -322,7 +323,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
         final Uint8List? bytes =
             await ScreenCaptureService.capturePng(_shareKey);
         if (bytes == null) {
-          throw Exception('Não foi possível capturar a imagem.');
+          throw Exception('NÃ£o foi possÃ­vel capturar a imagem.');
         }
         await ScreenCaptureService.sharePngBytes(
           bytes: bytes,
@@ -345,7 +346,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
           return;
         }
         final UserModel? user = await AuthService.getCurrentUser();
-        final String userName = user?.nome ?? 'Usuário';
+        final String userName = user?.nome ?? 'UsuÃ¡rio';
         final Uint8List pdf = await _listaPdfService.buildListaPdf(
           items: items,
           filters: filters,
@@ -450,7 +451,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     ),
                   ),
                   onChanged: (value) {
-                    print('🔍 Campo de busca alterado: "$value"');
+                    print('ðŸ” Campo de busca alterado: "$value"');
                   },
                 ),
               ),
@@ -572,7 +573,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Não há cirurgias agendadas para hoje.',
+              'NÃ£o hÃ¡ cirurgias agendadas para hoje.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
@@ -772,27 +773,27 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Data: ${agendamento.dataCirurgia} às ${agendamento.horaCirurgia}',
+                    'Data: ${agendamento.dataCirurgia} Ã s ${agendamento.horaCirurgia}',
                     style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Médico: ${agendamento.medicoName}',
-                    style: AppTheme.listItemSubtitleStyle,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'Convênio: ${agendamento.convenioName}',
+                    'MÃ©dico: ${agendamento.medicoName}',
                     style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
-                    'Hospital: ${agendamento.nomcli ?? 'Hospital não informado'}',
+                    'ConvÃªnio: ${agendamento.convenioName}',
+                    style: AppTheme.listItemSubtitleStyle,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Hospital: ${agendamento.nomcli ?? 'Hospital nÃ£o informado'}',
                     style: AppTheme.listItemSubtitleStyle,
                     maxLines: 1,
                     softWrap: false,
@@ -812,459 +813,38 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
     );
   }
 
-  void _showFilterDialog() {
-    _filtroPacienteController.text = _filtroPaciente ?? '';
-    _filtroNummovController.text = _filtroNummov ?? '';
-    _filtroMedicoController.text = _filtroMedico ?? '';
-    _filtroConvenioController.text = _filtroConvenio ?? '';
-    _filtroHospitalController.text = _filtroHospital ?? '';
-    _filtroTipoCirurgiaController.text = _filtroTipoCirurgia ?? '';
-    _filtroInstrumentadorController.text = _filtroInstrumentador ?? '';
-    _filtroVendedorController.text = _filtroVendedor ?? '';
-    AgendaDateFilterField dialogTipoData = _filtroTipoData;
-    AgendaTriFilter dialogAgendaCancelada = _filtroAgendaCancelada;
-    AgendaTriFilter dialogAgendaComPedido = _filtroAgendaComPedido;
-    AgendaTriFilter dialogAgendaComRelatorio = _filtroAgendaComRelatorio;
-    AgendaTriFilter dialogAgendaCopia = _filtroAgendaCopia;
-    AgendaTipmarFilter dialogTipoMarcacao = _filtroTipoMarcacao;
-    AgendaLadoFilter dialogLado = _filtroLado;
-    AgendaSituacaoFilter dialogSituacao = _filtroSituacao;
-    final DateTime maxDate = AgendaListFilters.maxAllowedSurgeryDate();
-    showProtectedDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setStateDialog) {
-            final DateTime pickerMinDate =
-                dialogTipoData == AgendaDateFilterField.dataMovto
-                    ? AgendaListFilters.minAllowedMovementDate()
-                    : AgendaListFilters.minAllowedSurgeryDate();
-            return AlertDialog(
-              title: const Text('Filtros'),
-              content: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    DropdownButtonFormField<AgendaDateFilterField>(
-                      value: dialogTipoData,
-                      decoration: _buildFilterDecoration('Tipo de data'),
-                      items: const <DropdownMenuItem<AgendaDateFilterField>>[
-                        DropdownMenuItem<AgendaDateFilterField>(
-                          value: AgendaDateFilterField.dataCirurgia,
-                          child: Text('Data Cirurgia'),
-                        ),
-                        DropdownMenuItem<AgendaDateFilterField>(
-                          value: AgendaDateFilterField.dataMovto,
-                          child: Text('Data Movto'),
-                        ),
-                      ],
-                      onChanged: (AgendaDateFilterField? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogTipoData = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Período:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final DateTime initialDate = _clampPickerDate(
-                          _filtroDataInicio ?? DateTime.now(),
-                          pickerMinDate,
-                          maxDate,
-                        );
-                        final DateTime? date = await showProtectedDatePicker(
-                          context: context,
-                          initialDate: initialDate,
-                          firstDate: pickerMinDate,
-                          lastDate: maxDate,
-                        );
-                        if (date != null) {
-                          setStateDialog(() {
-                            _filtroDataInicio = date;
-                          });
-                        }
-                      },
-                      child: Text(
-                        _filtroDataInicio != null
-                            ? 'De: ${_formatFilterDate(_filtroDataInicio!)}'
-                            : 'Data início',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final DateTime initialDate = _clampPickerDate(
-                          _filtroDataFim ?? DateTime.now(),
-                          pickerMinDate,
-                          maxDate,
-                        );
-                        final DateTime? date = await showProtectedDatePicker(
-                          context: context,
-                          initialDate: initialDate,
-                          firstDate: pickerMinDate,
-                          lastDate: maxDate,
-                        );
-                        if (date != null) {
-                          setStateDialog(() {
-                            _filtroDataFim = date;
-                          });
-                        }
-                      },
-                      child: Text(
-                        _filtroDataFim != null
-                            ? 'Até: ${_formatFilterDate(_filtroDataFim!)}'
-                            : 'Data fim',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroPacienteController,
-                      decoration: _buildFilterDecoration('Paciente').copyWith(
-                        hintText: 'Nome do paciente',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroNummovController,
-                      keyboardType: TextInputType.number,
-                      decoration: _buildFilterDecoration('No Agenda').copyWith(
-                        hintText: 'Número da agenda',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroMedicoController,
-                      decoration: _buildFilterDecoration('Médico').copyWith(
-                        hintText: 'Nome do médico',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroConvenioController,
-                      decoration: _buildFilterDecoration('Convênio').copyWith(
-                        hintText: 'Nome do convênio',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroHospitalController,
-                      decoration: _buildFilterDecoration('Hospital').copyWith(
-                        hintText: 'Nome do hospital',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroTipoCirurgiaController,
-                      decoration: _buildFilterDecoration('Tipo de Cirurgia').copyWith(
-                        hintText: 'Nome da cirurgia',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroInstrumentadorController,
-                      decoration: _buildFilterDecoration('Instrumentador').copyWith(
-                        hintText: 'Nome ou código',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _filtroVendedorController,
-                      decoration: _buildFilterDecoration('Vendedor').copyWith(
-                        hintText: 'Nome ou código',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTipmarFilter>(
-                      value: dialogTipoMarcacao,
-                      decoration: _buildFilterDecoration('Tipo Marcação'),
-                      items: const <DropdownMenuItem<AgendaTipmarFilter>>[
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.app,
-                          child: Text('A - App'),
-                        ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.web,
-                          child: Text('W - Web'),
-                        ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.desktop,
-                          child: Text('Vazio - Desktop'),
-                        ),
-                        DropdownMenuItem<AgendaTipmarFilter>(
-                          value: AgendaTipmarFilter.googleAgenda,
-                          child: Text('Google Agenda'),
-                        ),
-                      ],
-                      onChanged: (AgendaTipmarFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogTipoMarcacao = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: dialogAgendaCancelada,
-                      decoration: _buildFilterDecoration('Agenda Cancelada'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogAgendaCancelada = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: dialogAgendaComPedido,
-                      decoration: _buildFilterDecoration('Agenda com Pedido'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todos'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogAgendaComPedido = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: dialogAgendaComRelatorio,
-                      decoration: _buildFilterDecoration('Agenda com Relatório'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogAgendaComRelatorio = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaTriFilter>(
-                      value: dialogAgendaCopia,
-                      decoration: _buildFilterDecoration('Cópia Agenda'),
-                      items: const <DropdownMenuItem<AgendaTriFilter>>[
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.sim,
-                          child: Text('Sim'),
-                        ),
-                        DropdownMenuItem<AgendaTriFilter>(
-                          value: AgendaTriFilter.nao,
-                          child: Text('Não'),
-                        ),
-                      ],
-                      onChanged: (AgendaTriFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogAgendaCopia = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaSituacaoFilter>(
-                      value: dialogSituacao,
-                      decoration: _buildFilterDecoration('Situação agenda'),
-                      items: AgendaSituacaoFilter.values
-                          .map(
-                            (AgendaSituacaoFilter value) =>
-                                DropdownMenuItem<AgendaSituacaoFilter>(
-                              value: value,
-                              child: Text(value.label),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (AgendaSituacaoFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogSituacao = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<AgendaLadoFilter>(
-                      value: dialogLado,
-                      decoration: _buildFilterDecoration('Lado'),
-                      items: const <DropdownMenuItem<AgendaLadoFilter>>[
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.todas,
-                          child: Text('Todas'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.esquerdo,
-                          child: Text('Esquerdo'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.direito,
-                          child: Text('Direito'),
-                        ),
-                        DropdownMenuItem<AgendaLadoFilter>(
-                          value: AgendaLadoFilter.vazio,
-                          child: Text('Vazio'),
-                        ),
-                      ],
-                      onChanged: (AgendaLadoFilter? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setStateDialog(() {
-                          dialogLado = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                ),
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    setStateDialog(() {
-                      _filtroDataInicio = null;
-                      _filtroDataFim = null;
-                      dialogTipoData = AgendaDateFilterField.dataCirurgia;
-                      dialogAgendaCancelada = AgendaTriFilter.todas;
-                      dialogAgendaComPedido = AgendaTriFilter.todas;
-                      dialogAgendaComRelatorio = AgendaTriFilter.todas;
-                      dialogAgendaCopia = AgendaTriFilter.todas;
-                      dialogTipoMarcacao = AgendaTipmarFilter.todas;
-                      dialogLado = AgendaLadoFilter.todas;
-                      dialogSituacao = AgendaSituacaoFilter.todos;
-                    });
-                    _filtroPacienteController.clear();
-                    _filtroNummovController.clear();
-                    _filtroMedicoController.clear();
-                    _filtroConvenioController.clear();
-                    _filtroHospitalController.clear();
-                    _filtroTipoCirurgiaController.clear();
-                    _filtroInstrumentadorController.clear();
-                    _filtroVendedorController.clear();
-                  },
-                  child: const Text('Limpar'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    _filtroTipoData = dialogTipoData;
-                    _filtroAgendaCancelada = dialogAgendaCancelada;
-                    _filtroAgendaComPedido = dialogAgendaComPedido;
-                    _filtroAgendaComRelatorio = dialogAgendaComRelatorio;
-                    _filtroAgendaCopia = dialogAgendaCopia;
-                    _filtroTipoMarcacao = dialogTipoMarcacao;
-                    _filtroLado = dialogLado;
-                    _filtroSituacao = dialogSituacao;
-                    _filtroPaciente =
-                        _filtroPacienteController.text.trim().isEmpty
-                            ? null
-                            : _filtroPacienteController.text.trim();
-                    _filtroNummov = _filtroNummovController.text.trim().isEmpty
-                        ? null
-                        : _filtroNummovController.text.trim();
-                    _filtroMedico = _filtroMedicoController.text.trim().isEmpty
-                        ? null
-                        : _filtroMedicoController.text.trim();
-                    _filtroConvenio =
-                        _filtroConvenioController.text.trim().isEmpty
-                            ? null
-                            : _filtroConvenioController.text.trim();
-                    _filtroHospital =
-                        _filtroHospitalController.text.trim().isEmpty
-                            ? null
-                            : _filtroHospitalController.text.trim();
-                    _filtroTipoCirurgia =
-                        _filtroTipoCirurgiaController.text.trim().isEmpty
-                            ? null
-                            : _filtroTipoCirurgiaController.text.trim();
-                    _filtroInstrumentador =
-                        _filtroInstrumentadorController.text.trim().isEmpty
-                            ? null
-                            : _filtroInstrumentadorController.text.trim();
-                    _filtroVendedor =
-                        _filtroVendedorController.text.trim().isEmpty
-                            ? null
-                            : _filtroVendedorController.text.trim();
-                    _aplicarFiltros();
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('Aplicar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _showFilterDialog() async {
+    final AgendaListFilters? result = await AgendaFilterDialog.show(
+      context,
+      initial: _buildListFilters(),
+      requireDateRange: false,
+      showClearButton: true,
     );
+    if (result == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _filtroDataInicio = result.dateFrom;
+      _filtroDataFim = result.dateTo;
+      _filtroTipoData = result.dateField;
+      _filtroPaciente = result.pacienteQuery;
+      _filtroNummov = result.nummovQuery;
+      _filtroMedico = result.medicoQuery;
+      _filtroConvenio = result.convenioQuery;
+      _filtroHospital = result.hospitalQuery;
+      _filtroTipoCirurgia = result.tipoCirurgiaQuery;
+      _filtroInstrumentador = result.instrumentadorQuery;
+      _filtroVendedor = result.vendedorQuery;
+      _filtroAgendaCancelada = result.agendaCancelada;
+      _filtroAgendaComPedido = result.agendaComPedido;
+      _filtroAgendaComRelatorio = result.agendaComRelatorio;
+      _filtroAgendaCopia = result.agendaCopia;
+      _filtroTipoMarcacao = result.tipoMarcacao;
+      _filtroLado = result.lado;
+      _filtroSituacao = result.situacaoAgenda;
+      _filtrosAtivos = result.hasActiveFilters;
+    });
+    _loadFirstPage(force: true);
   }
 
   void _aplicarFiltros() {

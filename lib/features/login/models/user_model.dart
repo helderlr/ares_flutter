@@ -8,6 +8,7 @@ class UserModel {
   final String? login;
   final String? codven;
   final int? codusu;
+  final int? codins;
   final String? admsis;
   final String? ativo;
 
@@ -19,6 +20,7 @@ class UserModel {
     this.login,
     this.codven,
     this.codusu,
+    this.codins,
     this.admsis,
     this.ativo,
   });
@@ -40,6 +42,9 @@ class UserModel {
       codusu: json['codusu'] is int
           ? json['codusu'] as int
           : int.tryParse(json['codusu']?.toString() ?? ''),
+      codins: json['codins'] is int
+          ? json['codins'] as int
+          : int.tryParse(json['codins']?.toString() ?? ''),
       admsis: json['admsis']?.toString(),
       ativo: json['ativo']?.toString(),
     );
@@ -70,6 +75,7 @@ class UserModel {
       if (login != null) 'login': login,
       if (codven != null) 'codven': codven,
       if (codusu != null) 'codusu': codusu,
+      if (codins != null) 'codins': codins,
       if (admsis != null) 'admsis': admsis,
       if (ativo != null) 'ativo': ativo,
     };
@@ -83,6 +89,7 @@ class UserModel {
     String? login,
     String? codven,
     int? codusu,
+    int? codins,
     String? admsis,
     String? ativo,
   }) {
@@ -94,6 +101,7 @@ class UserModel {
       login: login ?? this.login,
       codven: codven ?? this.codven,
       codusu: codusu ?? this.codusu,
+      codins: codins ?? this.codins,
       admsis: admsis ?? this.admsis,
       ativo: ativo ?? this.ativo,
     );

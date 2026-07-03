@@ -3,8 +3,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/address_text_helper.dart';
 import '../../atendimento/utils/map_marker_colors.dart';
 import '../../relatorio_cirurgia/models/relatorio_cirurgia_model.dart';
+import '../../relatorio_cirurgia/services/relatorio_tipo_cirurgia_enrichment_service.dart';
 
 class RegistroHoraMapaPage extends StatefulWidget {
   final RelatorioCirurgia relatorio;
@@ -19,10 +21,32 @@ class RegistroHoraMapaPage extends StatefulWidget {
 }
 
 class _RegistroHoraMapaPageState extends State<RegistroHoraMapaPage> {
+  final RelatorioTipoCirurgiaEnrichmentService _enrichmentService =
+      RelatorioTipoCirurgiaEnrichmentService();
   GoogleMapController? _mapController;
   LatLng _cameraTarget = const LatLng(-3.7504, -38.5017);
+  RelatorioCirurgia? _enrichedItem;
+  bool _isLoading = true;
 
-  RelatorioCirurgia get _item => widget.relatorio;
+  @override
+  void initState() {
+    super.initState();
+    _loadEnriched();
+  }
+
+  Future<void> _loadEnriched() async {
+    final RelatorioCirurgia enriched =
+        await _enrichmentService.enrichItem(widget.relatorio);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _enrichedItem = enriched;
+      _isLoading = false;
+    });
+  }
+
+  RelatorioCirurgia get _item => _enrichedItem ?? widget.relatorio;
 
   LatLng? get _inicioLocation {
     if (!_item.hasLocalizacaoInicio) {
@@ -53,78 +77,87 @@ class _RegistroHoraMapaPageState extends State<RegistroHoraMapaPage> {
       appBar: AppBar(
         title: Text('Detalhes - ${_item.pacienteName}'),
       ),
-      body: Column(
-        children: <Widget>[
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.42,
-            child: GoogleMap(
-              initialCameraPosition: CameraPosition(
-                target: _cameraTarget,
-                zoom: 14,
-              ),
-              markers: markers,
-              polylines: polylines,
-              onMapCreated: (GoogleMapController controller) {
-                _mapController = controller;
-                _fitBounds(inicio, fim);
-              },
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: true,
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: <Widget>[
-                Text(
-                  _item.tipoCirurgiaDisplay,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Data: ${_item.dataCirurgiaDisplay}',
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 16),
-                _buildLocationTile(
-                  label: 'Início',
-                  time: _item.horaInicioDisplay,
-                  address: _item.enderecoInicio,
-                  color: Colors.green,
-                  hasLocation: inicio != null,
-                ),
-                const SizedBox(height: 12),
-                _buildLocationTile(
-                  label: 'Fim',
-                  time: _item.horaFimDisplay,
-                  address: _item.enderecoFim,
-                  color: Colors.red,
-                  hasLocation: fim != null,
-                ),
-                if (inicio != null && fim != null) ...<Widget>[
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _openGoogleMapsRoute,
-                      icon: const Icon(Icons.map_outlined),
-                      label: const Text('Ver rota no Google Maps'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.lightBlue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.42,
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _cameraTarget,
+                      zoom: 14,
                     ),
+                    markers: markers,
+                    polylines: polylines,
+                    onMapCreated: (GoogleMapController controller) {
+                      _mapController = controller;
+                      _fitBounds(inicio, fim);
+                    },
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: true,
                   ),
-                ],
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: <Widget>[
+                      Text(
+                        _item.pacienteName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Cirurgia: ${_item.tipoCirurgiaDisplay}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Data: ${_item.dataCirurgiaDisplay}',
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildLocationTile(
+                        label: 'Início',
+                        time: _item.horaInicioDisplay,
+                        address: _item.enderecoInicio,
+                        color: Colors.green,
+                        hasLocation: inicio != null,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildLocationTile(
+                        label: 'Fim',
+                        time: _item.horaFimDisplay,
+                        address: _item.enderecoFim,
+                        color: Colors.red,
+                        hasLocation: fim != null,
+                      ),
+                      const SizedBox(height: 20),
+                      if (inicio != null && fim != null)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _openGoogleMapsRoute,
+                            icon: const Icon(Icons.map),
+                            label: const Text('Ver rota no Google Maps'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.lightBlue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -215,7 +248,7 @@ class _RegistroHoraMapaPageState extends State<RegistroHoraMapaPage> {
                 Text(
                   hasLocation
                       ? (address?.trim().isNotEmpty == true
-                          ? address!.trim()
+                          ? AddressTextHelper.normalize(address!.trim())
                           : 'Localização registrada')
                       : 'Localização não registrada',
                   style: TextStyle(

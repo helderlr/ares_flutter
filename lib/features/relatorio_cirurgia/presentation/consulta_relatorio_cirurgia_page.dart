@@ -401,7 +401,7 @@ class _ConsultaRelatorioCirurgiaPageState
       _buildInfoField('Medico', _textOrEmpty(item.medNome), true),
       _buildInfoField('Hospital/Clinica', _textOrEmpty(item.cliNome), true),
       _buildInfoField('Convenio', _textOrEmpty(item.convNome), true),
-      _buildInfoField('Tipo Cirurgia', _textOrEmpty(item.tipoCirNome), true),
+      _buildInfoField('Tipo Cirurgia', _textOrEmpty(item.tipoCirurgiaDisplay), true),
       _buildInfoField('Data Cirurgia', item.dataCirurgiaDisplay, true),
       _buildInfoField('Data Emissao', item.dataEmissaoDisplay, true),
       _buildInfoField('Inicio', _textOrEmpty(item.hrini), true),
